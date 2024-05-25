@@ -1,0 +1,15 @@
+program ifExample;
+var
+   num1, num2, result : integer;
+
+begin
+   num1 := 100;
+   num2 := 200;
+   if (num1 > num2) then
+      result := num1
+
+   else
+      result := num2;
+
+   writeln( 'Max value is : ', result );
+end.

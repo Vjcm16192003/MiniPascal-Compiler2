@@ -1,0 +1,23 @@
+
+program Hello;
+
+var
+  a, ret : string;
+
+  function max(n: string; i: integer): string;
+  var
+     result: string;
+  begin
+  result := 'que onda guapa';
+     max := result
+  end;
+
+begin
+
+    a := 'bye';
+    {calling a function to get max value}
+    ret := max(a,2);
+
+    writeln( 'Max value is : ', ret );
+
+end.

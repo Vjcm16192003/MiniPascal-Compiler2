@@ -1,0 +1,14 @@
+program Hello;
+
+var
+  a, b, ret: integer;
+  str: string;
+  c : char;
+  d : boolean;
+
+begin
+
+    a := 100;
+    z := 200;
+
+end.

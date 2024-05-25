@@ -1,0 +1,15 @@
+program ifExample;
+var
+   num1, num2, result : integer;
+
+begin
+   num1 := 100;
+   num2 := 200;
+   if (num1 num2) thens {le falta un operador en medio de num1 y num2, y es 'then' en vez de 'thens'}
+      result := num1
+
+   else
+      result := num2;
+
+   writeln( 'Max value is : ',  ); {le falta el segundo parámetro al writeln, le falta un IDENT}
+end.
