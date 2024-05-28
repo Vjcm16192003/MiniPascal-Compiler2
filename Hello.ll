@@ -4,9 +4,9 @@
 @result = global i1 0
 define i32 @main() {
 entry:
-	store i1 true, ptr @a
-	store i1 false, ptr @b
-	store i1 aandnotb, ptr @result
+	store i1 1, i1* @a
+	store i1 0, i1* @b
+	store i1 , i1* @result
 end:
 	ret i32 0
 }

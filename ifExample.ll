@@ -4,16 +4,19 @@
 @result = global i32 0
 define i32 @main() {
 entry:
-	store i32 100, ptr @num1
-	store i32 200, ptr @num2
+	store i32 100, i32* @num1
+	store i32 200, i32* @num2
 	%temp.1 = icmp sgt i32 num1, num2
-	%temp.2 = icmp sgt i32 num1, num2
-	br i1 %temp.2, label %itag, label %etag
+	br i1 1, label %itag, label %etag
 
 itag:
-	store i32 num1, ptr @result
+	store i32 num1, i32* @result
+	br label %end
+
 etag:
-	store i32 num2, ptr @result
+	store i32 num2, i32* @result
+	br label %end
+
 end:
 	ret i32 0
 }

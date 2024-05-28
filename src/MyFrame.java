@@ -171,6 +171,11 @@ public class MyFrame extends JFrame implements ActionListener {
         tp.replaceSelection(msg);
     }
 
+    private void clearConsole() {
+        System.out.print("\033[H\033[2J");
+        System.out.flush();
+    }
+
     public static void main(String[] args) {
         new MyFrame();
     }
