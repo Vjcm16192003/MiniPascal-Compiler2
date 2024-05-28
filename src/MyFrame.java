@@ -16,6 +16,7 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -24,23 +25,34 @@ import java.util.List;
 
 public class MyFrame extends JFrame implements ActionListener {
 
-    JButton button;
-    TextArea Code;
+    JButton button, clearButton, loadButton;
+    JTextArea Code;
     JTextPane console;
     JScrollPane wscroller;
-    Box codearea;
+    JPanel codearea;
     JFrame pFrame = new JFrame(), viewIR = new JFrame();
-    MyFrame(){
+
+    MyFrame() {
         this.setTitle("Mini Pascal");
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        this.setLayout(new FlowLayout());
-        this.setSize(1000, 620);
+        this.setLayout(new BorderLayout());
+        this.setSize(800, 600);
         this.setLocationRelativeTo(null);
-        codearea = Box.createVerticalBox();
+
+        codearea = new JPanel();
+        codearea.setLayout(new BoxLayout(codearea, BoxLayout.Y_AXIS));
+
         button = new JButton("Iniciar Programa");
         button.addActionListener(this);
-        Code = new TextArea(30, 80);
+
+        clearButton = new JButton("Limpiar");
+        clearButton.addActionListener(this);
+
+        loadButton = new JButton("Cargar Archivo");
+        loadButton.addActionListener(this);
+
+        Code = new JTextArea(15, 60);
         console = new JTextPane();
         console.setBounds(0,0,600,600);
         wscroller = new JScrollPane(console){
@@ -53,20 +65,27 @@ public class MyFrame extends JFrame implements ActionListener {
         Code.setEditable(true);
         JLabel editor = new JLabel("Editor");
         JLabel logs = new JLabel("Log");
+
         codearea.add(editor);
-        codearea.add(Code);
+        codearea.add(new JScrollPane(Code));
         codearea.add(logs);
         codearea.add(wscroller);
+
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.setLayout(new FlowLayout());
+        buttonPanel.add(button);
+        buttonPanel.add(clearButton);
+        buttonPanel.add(loadButton);
+
         this.add(codearea, BorderLayout.CENTER);
-        this.add(button);
+        this.add(buttonPanel, BorderLayout.SOUTH);
 
         this.setVisible(true);
     }
 
-
     @Override
-    public void actionPerformed(ActionEvent e){
-        if(e.getSource()==button){
+    public void actionPerformed(ActionEvent e) {
+        if (e.getSource() == button) {
             pFrame.setVisible(false);
             viewIR.setVisible(false);
             CharStream input = CharStreams.fromString(Code.getText());
@@ -80,22 +99,21 @@ public class MyFrame extends JFrame implements ActionListener {
             if (!MyErrorListener.hasError) {
                 pFrame = new JFrame("Parse Tree");
 
-                //List
+                // List
                 List<String> rules = new ArrayList<>();
                 rules.addAll(Arrays.asList(parser.getRuleNames()));
 
                 TreeViewer viewer = new TreeViewer(rules, tree);
-                viewer.setScale(viewer.getScale()/1.5);
+                viewer.setScale(viewer.getScale() / 1.5);
                 pFrame.add(viewer);
                 pFrame.pack();
                 pFrame.setLocationRelativeTo(null);
-                //frame.setSize(frame.getWidth(), frame.getHeight());
                 pFrame.setVisible(true);
                 pFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
-                AST visitor  = new AST(console);
+                AST visitor = new AST(console);
                 visitor.visit(tree);
-                if(visitor.getSemantic()){
+                if (visitor.getSemantic()) {
                     IRGenerator irGenerator = new IRGenerator(visitor.symbolTable());
                     irGenerator.visit(tree);
                     viewIR = new JFrame("IR de Codigo de Mini Pascal");
@@ -105,30 +123,42 @@ public class MyFrame extends JFrame implements ActionListener {
                     viewIR.setSize(1280, 720);
                     viewIR.setLocationRelativeTo(null);
                     try {
-
-                        FileWriter file = new FileWriter(visitor.getName()+".ll");
+                        FileWriter file = new FileWriter(visitor.getName() + ".ll");
                         file.write(irGenerator.getIR());
                         file.close();
                     } catch (IOException ex) {
                         throw new RuntimeException(ex);
                     }
-                    TextArea IRcode = new TextArea(40, 80);
+                    JTextArea IRcode = new JTextArea(40, 80);
                     IRcode.setEditable(false);
                     IRcode.setText(irGenerator.getIR());
-                    viewIR.add(IRcode);
+                    viewIR.add(new JScrollPane(IRcode));
                     viewIR.setVisible(true);
                 }
-            }else{
+            } else {
                 console.setText(null);
-                appendToPane(console, MyErrorListener.getErrors()+"\n", Color.RED);
+                appendToPane(console, MyErrorListener.getErrors() + "\n", Color.RED);
                 console.update(console.getGraphics());
                 MyErrorListener.reset();
+            }
+        } else if (e.getSource() == clearButton) {
+            Code.setText("");
+            console.setText("");
+        } else if (e.getSource() == loadButton) {
+            JFileChooser fileChooser = new JFileChooser();
+            int result = fileChooser.showOpenDialog(this);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File selectedFile = fileChooser.getSelectedFile();
+                try (FileReader reader = new FileReader(selectedFile)) {
+                    Code.read(reader, null);
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
             }
         }
     }
 
-    private void appendToPane(JTextPane tp, String msg, Color c)
-    {
+    private void appendToPane(JTextPane tp, String msg, Color c) {
         StyleContext sc = StyleContext.getDefaultStyleContext();
         AttributeSet aset = sc.addAttribute(SimpleAttributeSet.EMPTY, StyleConstants.Foreground, c);
 
@@ -141,4 +171,7 @@ public class MyFrame extends JFrame implements ActionListener {
         tp.replaceSelection(msg);
     }
 
+    public static void main(String[] args) {
+        new MyFrame();
+    }
 }
