@@ -175,6 +175,7 @@ public class MyFrame extends JFrame implements ActionListener {
 
                 try {
                     // Obtener el texto del JTextArea
+                    System.out.printf(Code.toString());
                     String textContent = Code.getText();
 
                     // Escribir el contenido en el archivo
