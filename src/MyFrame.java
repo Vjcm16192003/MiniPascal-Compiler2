@@ -15,10 +15,7 @@ import javax.swing.text.StyleContext;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -159,7 +156,39 @@ public class MyFrame extends JFrame implements ActionListener {
                     ex.printStackTrace();
                 }
             }
+        }else if (e.getSource() == saveButton){
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setCurrentDirectory(new File("./src"));
+            fileChooser.setDialogTitle("Save TXT File");
+
+            int userSelection = fileChooser.showSaveDialog(null);
+
+            if (userSelection == JFileChooser.APPROVE_OPTION) {
+                File selectedFile = fileChooser.getSelectedFile();
+                String filePath = selectedFile.getAbsolutePath();
+
+                // Asegurarse de que el archivo tenga la extensión .txt
+                if (!filePath.endsWith(".txt")) {
+                    filePath += ".txt";
+                    selectedFile = new File(filePath);
+                }
+
+                try {
+                    // Obtener el texto del JTextArea
+                    String textContent = Code.getText();
+
+                    // Escribir el contenido en el archivo
+                    try (BufferedWriter writer = new BufferedWriter(new FileWriter(selectedFile))) {
+                        writer.write(textContent);
+                    }
+
+                    System.out.println("Archivo guardado exitosamente: " + filePath);
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
         }
+
     }
 
     private void appendToPane(JTextPane tp, String msg, Color c) {
