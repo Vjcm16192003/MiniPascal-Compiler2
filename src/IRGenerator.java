@@ -121,43 +121,91 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
 
     @Override
     public String visitExpression(MiniPascalParser.ExpressionContext ctx) {
-        if (ctx.getChildCount() > 1) {
-            String left = this.visit(ctx.simpleExpression());
-            String right = this.visit(ctx.expression());
+        if (ctx.relationaloperator() != null) {
+            String leftVar = this.visit(ctx.getChild(0));
+            String rightVar = this.visit(ctx.getChild(2));
+            String left = "";
+            String right = "";
+
+            if (isNumeric(leftVar)) {
+                left = leftVar;
+            } else {
+                if (names.containsKey(leftVar)) {
+                    temps++;
+                    left = "%temp." + temps;
+                    irInstructions.add("\n\t" + left + " = load i32, i32* @" + leftVar);
+                } else {
+                    left = leftVar;
+                }
+            }
+
+            if (isNumeric(rightVar)) {
+                right = rightVar;
+            } else {
+                if (names.containsKey(rightVar)) {
+                    temps++;
+                    right = "%temp." + temps;
+                    irInstructions.add("\n\t" + right + " = load i32, i32* @" + rightVar);
+                } else {
+                    right = rightVar;
+                }
+            }
 
             String op = ctx.relationaloperator().getText();
+            String comparisonResult = "";
             switch (op) {
                 case "=":
                     temps++;
-                    irInstructions.add("\n\t%temp." + temps + " = icmp eq i32 " + left + ", " + right);
-                    return "%temp." + temps;
+                    comparisonResult = "%temp." + temps;
+                    irInstructions.add("\n\t" + comparisonResult + " = icmp eq i32 " + left + ", " + right);
+                    break;
                 case "<>":
                     temps++;
-                    irInstructions.add("\n\t%temp." + temps + " = icmp ne i32 " + left + ", " + right);
-                    return "%temp." + temps;
+                    comparisonResult = "%temp." + temps;
+                    irInstructions.add("\n\t" + comparisonResult + " = icmp ne i32 " + left + ", " + right);
+                    break;
                 case ">":
+                    System.out.println("Entro a la comparativa >");
                     temps++;
-                    irInstructions.add("\n\t%temp." + temps + " = icmp sgt i32 " + left + ", " + right);
-                    return "%temp." + temps;
+                    comparisonResult = "%temp." + temps;
+                    System.out.println("Comparison result en el >: " + comparisonResult);
+                    irInstructions.add("\n\t" + comparisonResult + " = icmp sgt i32 " + left + ", " + right);
+                    break;
                 case ">=":
                     temps++;
-                    irInstructions.add("\n\t%temp." + temps + " = icmp sge i32 " + left + ", " + right);
-                    return "%temp." + temps;
+                    comparisonResult = "%temp." + temps;
+                    irInstructions.add("\n\t" + comparisonResult + " = icmp sge i32 " + left + ", " + right);
+                    break;
                 case "<":
                     temps++;
-                    irInstructions.add("\n\t%temp." + temps + " = icmp slt i32 " + left + ", " + right);
-                    return "%temp." + temps;
+                    comparisonResult = "%temp." + temps;
+                    irInstructions.add("\n\t" + comparisonResult + " = icmp slt i32 " + left + ", " + right);
+                    break;
                 case "<=":
                     temps++;
-                    irInstructions.add("\n\t%temp." + temps + " = icmp sle i32 " + left + ", " + right);
-                    return "%temp." + temps;
+                    comparisonResult = "%temp." + temps;
+                    irInstructions.add("\n\t" + comparisonResult + " = icmp sle i32 " + left + ", " + right);
+                    break;
                 default:
-                    return "";
+                    break;
             }
+            System.out.println("Comparison Result a retornar: "+ comparisonResult);
+            return comparisonResult;
         } else {
+            System.out.println("Llego al return que no deberia.");
             return this.visit(ctx.simpleExpression());
         }
     }
+
+    private boolean isNumeric(String str) {
+        try {
+            Integer.parseInt(str);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
 
     @Override
     public String visitSimpleExpression(MiniPascalParser.SimpleExpressionContext ctx) {
@@ -292,23 +340,18 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
         ifstate = true;
         temps = 0;
         repetitions = new ArrayList<>();
-        String s = ctx.expression().getText().toLowerCase();
-        matches = (int) countOccurrences(s, "and");
-        matches = matches + (int) countOccurrences(s, "or");
-        matches++;
-        this.visit(ctx.expression());
-        irInstructions.add("\n\tbr i1 " + temps + ", label %itag, label %etag\n");
+        String conditionResult = this.visit(ctx.expression());
+        irInstructions.add("\n\tbr i1 " + conditionResult + ", label %itag, label %etag\n");
         irInstructions.add("\nitag:");
         this.visit(ctx.statement(0));
-        irInstructions.add("\n\tbr label %end\n");
+        irInstructions.add("\n\tbr label %end"); // Añadir br para saltar al final después del itag
         irInstructions.add("\netag:");
-        if (ctx.ELSE() != null) {
-            this.visit(ctx.statement(1));
-        }
-        irInstructions.add("\n\tbr label %end\n");
+        this.visit(ctx.statement(1));
+        irInstructions.add("\n\tbr label %end"); // Añadir br para saltar al final después del etag
         condcount = 0;
         return "";
     }
+
 
     public static long countOccurrences(String source, String find) {
         return Pattern.compile(find) // Pattern
