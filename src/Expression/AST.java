@@ -17,9 +17,6 @@ import javax.swing.text.StyleContext;
 // Our custom visitor extends the base visitor
 public class AST extends MiniPascalBaseVisitor<Data>{
 
-
-
-
     // Diferentes listas de variables para el encapsulamiento
     Stack<HashMap<java.lang.String, Data>> localVars = new Stack<>();
     // Global vars will be the variables at the lowest scope level
@@ -229,7 +226,7 @@ public class AST extends MiniPascalBaseVisitor<Data>{
                     if(localVars.peek().containsKey(varName)) {
 
                         if(value == null){
-                            System.out.println("and i oop");
+                            System.out.println("error, vuelva a intentarlo");
                             return null;
                         }
                         System.out.println("Instanciado como " + localVars.peek().get(varName).instanceOf()
@@ -264,8 +261,6 @@ public class AST extends MiniPascalBaseVisitor<Data>{
                             localVars.peek().put(varName, value);
                         }
 
-                        //localVars.peek().put(varName, value);
-
                     }
                 }
 
@@ -283,7 +278,6 @@ public class AST extends MiniPascalBaseVisitor<Data>{
                         System.out.println("Instanciado como " + localVars.peek().get(vNames[i]).instanceOf()
                                 + " asignándole " + value.instanceOf());
 
-                        //System.out.println("el value es "+value);//succ
 
                         if (!localVars.peek().get(vNames[i]).instanceOf().equals(value.instanceOf())
                                 && !((localVars.peek().get(vNames[i]).instanceOf().equals("array") && value.instanceOf().equals("integer")))) {
@@ -297,12 +291,8 @@ public class AST extends MiniPascalBaseVisitor<Data>{
                         }
 
                     }
-                    //localVars.peek().put(vNames[i], value);
-
                 }
             }
-
-            //System.out.println("Local initialized variables: " + localVars.peek());
 
             return value;
         }else{
@@ -521,7 +511,9 @@ public class AST extends MiniPascalBaseVisitor<Data>{
         }
         return this.visit(ctx.factor());
     }
-    /******************getting types of data**********************/
+
+
+
     @Override
     public Data visitNotFactor(MiniPascalParser.NotFactorContext ctx) {
         Data bool = visit(ctx.factor());

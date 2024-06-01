@@ -15,17 +15,14 @@ import javax.swing.text.StyleContext;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 public class MyFrame extends JFrame implements ActionListener {
 
-    JButton button, clearButton, loadButton;
+    JButton button, clearButton, loadButton, saveButton;
     JTextArea Code;
     JTextPane console;
     JScrollPane wscroller;
@@ -33,11 +30,11 @@ public class MyFrame extends JFrame implements ActionListener {
     JFrame pFrame = new JFrame(), viewIR = new JFrame();
 
     MyFrame() {
-        this.setTitle("Mini Pascal");
+        this.setTitle("Compilador de Mini Pascal");
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         this.setLayout(new BorderLayout());
-        this.setSize(800, 600);
+        this.setSize(850, 700);
         this.setLocationRelativeTo(null);
 
         codearea = new JPanel();
@@ -52,19 +49,22 @@ public class MyFrame extends JFrame implements ActionListener {
         loadButton = new JButton("Cargar Archivo");
         loadButton.addActionListener(this);
 
-        Code = new JTextArea(15, 60);
+        saveButton = new JButton("Guardar Archivo");
+        saveButton.addActionListener(this);
+
+        Code = new JTextArea(10, 40);
         console = new JTextPane();
-        console.setBounds(0,0,600,600);
+        console.setBounds(0,0,50,50);
         wscroller = new JScrollPane(console){
             @Override
             public Dimension getPreferredSize() {
-                return new Dimension(200, 100);
+                return new Dimension(100, 50);
             }
         };
         wscroller.setBounds(0,0,600,600);
         Code.setEditable(true);
-        JLabel editor = new JLabel("Editor");
-        JLabel logs = new JLabel("Log");
+        JLabel editor = new JLabel("Code Editor");
+        JLabel logs = new JLabel("Console Log");
 
         codearea.add(editor);
         codearea.add(new JScrollPane(Code));
@@ -76,6 +76,7 @@ public class MyFrame extends JFrame implements ActionListener {
         buttonPanel.add(button);
         buttonPanel.add(clearButton);
         buttonPanel.add(loadButton);
+        buttonPanel.add(saveButton);
 
         this.add(codearea, BorderLayout.CENTER);
         this.add(buttonPanel, BorderLayout.SOUTH);
@@ -116,11 +117,11 @@ public class MyFrame extends JFrame implements ActionListener {
                 if (visitor.getSemantic()) {
                     IRGenerator irGenerator = new IRGenerator(visitor.symbolTable());
                     irGenerator.visit(tree);
-                    viewIR = new JFrame("IR de Codigo de Mini Pascal");
+                    viewIR = new JFrame("Representacion Intermedia de Codigo de Mini Pascal");
                     viewIR.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
                     viewIR.setLayout(new FlowLayout());
-                    viewIR.setSize(1280, 720);
+                    viewIR.setSize(1000, 620);
                     viewIR.setLocationRelativeTo(null);
                     try {
                         FileWriter file = new FileWriter(visitor.getName() + ".ll");
@@ -129,7 +130,7 @@ public class MyFrame extends JFrame implements ActionListener {
                     } catch (IOException ex) {
                         throw new RuntimeException(ex);
                     }
-                    JTextArea IRcode = new JTextArea(40, 80);
+                    JTextArea IRcode = new JTextArea(30, 60);
                     IRcode.setEditable(false);
                     IRcode.setText(irGenerator.getIR());
                     viewIR.add(new JScrollPane(IRcode));
@@ -155,7 +156,40 @@ public class MyFrame extends JFrame implements ActionListener {
                     ex.printStackTrace();
                 }
             }
+        }else if (e.getSource() == saveButton){
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setCurrentDirectory(new File("./src"));
+            fileChooser.setDialogTitle("Save TXT File");
+
+            int userSelection = fileChooser.showSaveDialog(null);
+
+            if (userSelection == JFileChooser.APPROVE_OPTION) {
+                File selectedFile = fileChooser.getSelectedFile();
+                String filePath = selectedFile.getAbsolutePath();
+
+                // Asegurarse de que el archivo tenga la extensión .txt
+                if (!filePath.endsWith(".txt")) {
+                    filePath += ".txt";
+                    selectedFile = new File(filePath);
+                }
+
+                try {
+                    // Obtener el texto del JTextArea
+                    System.out.printf(Code.toString());
+                    String textContent = Code.getText();
+
+                    // Escribir el contenido en el archivo
+                    try (BufferedWriter writer = new BufferedWriter(new FileWriter(selectedFile))) {
+                        writer.write(textContent);
+                    }
+
+                    System.out.println("Archivo guardado exitosamente: " + filePath);
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
         }
+
     }
 
     private void appendToPane(JTextPane tp, String msg, Color c) {
