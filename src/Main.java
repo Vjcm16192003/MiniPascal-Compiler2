@@ -10,7 +10,7 @@ public class Main {
     }
 
     public static void miniPascalLexer() throws IOException {
-        CharStream input = CharStreams.fromFileName("test.txt");//CharStreams.fromStream(System.in);
+        CharStream input = CharStreams.fromFileName("test.txt");
         MiniPascalLexer lexer = new MiniPascalLexer(input);
         CommonTokenStream tokens = new CommonTokenStream(lexer);
         tokens.fill();

@@ -206,7 +206,7 @@ public class AST extends MiniPascalBaseVisitor<Data>{
                 Data[] var = temp.toArray();
                 var[pos1.toInteger()-temp.getPos1()] = value;
                 localVars.peek().put(varName, new Data(var, localVars.size()));
-                System.out.println("Se asigno a la variable: " + varName + ", el valor: " + value);
+                System.out.println("Se le asigno a la variable: " + varName + ", el siguiente valor: " + value);
             }
 
             if (vNames == null) {
@@ -221,16 +221,15 @@ public class AST extends MiniPascalBaseVisitor<Data>{
                     semantic=false;
                 } else {
 
-                    System.out.println("Se asigno a la variable: " + varName + ", el valor: " + value);
-                    //System.out.println(globalVars.get(varName).instanceOf());
+                    System.out.println("Se le asigno a la variable: " + varName + ", el siguiente valor: " + value);
                     if(localVars.peek().containsKey(varName)) {
 
                         if(value == null){
                             System.out.println("error, vuelva a intentarlo");
                             return null;
                         }
-                        System.out.println("Instanciado como " + localVars.peek().get(varName).instanceOf()
-                                + " asignándole " + value.instanceOf());
+                        System.out.println("Tipo de variable Instanciado como: " + localVars.peek().get(varName).instanceOf()
+                                + " asignándole: " + value.instanceOf());
 
                         //System.out.println("el value es "+value);//succ
 
@@ -238,7 +237,7 @@ public class AST extends MiniPascalBaseVisitor<Data>{
                         if (!localVars.peek().get(varName).instanceOf().equals(value.instanceOf())
                                 && !((localVars.peek().get(varName).instanceOf().equals("array") && value.instanceOf().equals("integer")))) {
                             java.lang.String err = "Error Semantico en la linea "+ctx.getStart().getLine()+": Se esparaba tipo: '"+localVars.peek().get(varName).instanceOf()+
-                                    "' en la variable '"+varName+"', pero se dio tipo: '"+value.instanceOf()+"'";//CAMBIOOOO
+                                    "' en la variable '"+varName+"', pero se dio tipo: '"+value.instanceOf()+"'";
                             appendToPane(writer, err+"\n", Color.RED);
                             writer.update(writer.getGraphics());
                             semantic=false;

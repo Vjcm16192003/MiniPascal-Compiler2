@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
 
 public class IRGenerator extends MiniPascalBaseVisitor<String> {
     private Stack<HashMap<String, Data>> localVars = new Stack<>();
-    private HashMap<String, IRData> names = new HashMap<>();
+    private HashMap<String, Data_RI> names = new HashMap<>();
     private ArrayList<String> irInstructions = new ArrayList<>();
     private ArrayList<String> func_procs = new ArrayList<>();
     private ArrayList<String> global_strings = new ArrayList<>();
@@ -24,14 +24,14 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
 
     @Override
     public String visitProgram(MiniPascalParser.ProgramContext ctx) {
-        System.out.println("Segunda pasada, estoy en visitProgram");
+        //System.out.println("Segunda pasada, estoy en visitProgram");
         scope = false;
         return super.visitProgram(ctx);
     }
 
     @Override
     public String visitProgramHeading(MiniPascalParser.ProgramHeadingContext ctx) {
-        System.out.println("Segunda pasada, estoy en visitProgramHeading");
+        //System.out.println("Segunda pasada, estoy en visitProgramHeading");
         return super.visitProgramHeading(ctx);
     }
 
@@ -70,22 +70,22 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
         }
         if (vNames == null) { // Si las variables están declaradas sin coma, separadas por ;
             if (!scope) {
-                names.put(varName, new IRData("@" + varName, ctx.type_().getText().toLowerCase(), false));
+                names.put(varName, new Data_RI("@" + varName, ctx.type_().getText().toLowerCase(), false));
                 irInstructions.add("\n@" + varName + " = global " + getLLVMDataType(ctx.type_().getText().toLowerCase()) + " 0");
                 return "";
             } else {
-                names.put(varName, new IRData("%" + varName, ctx.type_().getText().toLowerCase(), false));
+                names.put(varName, new Data_RI("%" + varName, ctx.type_().getText().toLowerCase(), false));
                 return "\n\t%" + varName + " = alloca " + getLLVMDataType(ctx.type_().getText().toLowerCase());
             }
         } else { // Var a,b,c: boolean, por ejemplo
             String line = "";
             for (int i = 0; i < vNames.length; i++) {
                 if (!scope) {
-                    names.put(vNames[i], new IRData("@" + vNames[i], ctx.type_().getText().toLowerCase(), false));
+                    names.put(vNames[i], new Data_RI("@" + vNames[i], ctx.type_().getText().toLowerCase(), false));
                     irInstructions.add("\n@" + vNames[i] + " = global " + getLLVMDataType(ctx.type_().getText().toLowerCase()) + " 0");
                     line = "";
                 } else {
-                    names.put(vNames[i], new IRData("%" + vNames[i], ctx.type_().getText().toLowerCase(), false));
+                    names.put(vNames[i], new Data_RI("%" + vNames[i], ctx.type_().getText().toLowerCase(), false));
                     line = line + "\n\t%" + vNames[i] + " = alloca " + getLLVMDataType(ctx.type_().getText().toLowerCase());
                 }
             }
@@ -192,7 +192,7 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
             System.out.println("Comparison Result a retornar: "+ comparisonResult);
             return comparisonResult;
         } else {
-            System.out.println("Llego al return que no deberia.");
+            //System.out.println("Llego al return que no deberia.");
             return this.visit(ctx.simpleExpression());
         }
     }
@@ -365,7 +365,7 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
         scope = true;
         String name = ctx.identifier().getText();
         String line = "\ndefine " + getLLVMDataType(ctx.resultType().getText().toLowerCase()) + " @" + name + "(";
-        names.put(name, new IRData("@" + name, ctx.resultType().getText().toLowerCase(), true));
+        names.put(name, new Data_RI("@" + name, ctx.resultType().getText().toLowerCase(), true));
         func_procs.add(name);
         for (int i = 0; i < ctx.formalParameterList().formalParameterSection().size(); i++) {
             String varName = ctx.formalParameterList().formalParameterSection(i).parameterGroup().identifierList().getText();
@@ -404,7 +404,7 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
         for (MiniPascalParser.ActualParameterContext c : ctx.parameterList().actualParameter()) {
             if (names.get(c.expression().getText()) != null) {
                 cparam++;
-                params.add(getLLVMDataType(names.get(c.expression().getText()).type) + " %t" + cparam);
+                params.add(getLLVMDataType(names.get(c.expression().getText()).type) + " %temp" + cparam);
                 irInstructions.add("\n\t%t" + cparam + " = load " + getLLVMDataType(names.get(c.expression().getText()).type) + ", " + getLLVMDataType(names.get(c.expression().getText()).type) + "* " + names.get(c.expression().getText()).IRname);
             } else {
                 try {
