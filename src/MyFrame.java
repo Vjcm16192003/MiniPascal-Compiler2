@@ -22,12 +22,13 @@ import java.util.List;
 
 public class MyFrame extends JFrame implements ActionListener {
 
-    JButton button, clearButton, loadButton, saveButton;
+    JButton button, clearButton, loadButton, saveButton, exportButton;
     JTextArea Code;
     JTextPane console;
     JScrollPane wscroller;
     JPanel codearea;
     JFrame pFrame = new JFrame(), viewIR = new JFrame();
+    IRGenerator irGenerator;
 
     MyFrame() {
         this.setTitle("Compilador de Mini Pascal");
@@ -115,25 +116,44 @@ public class MyFrame extends JFrame implements ActionListener {
                 AST visitor = new AST(console);
                 visitor.visit(tree);
                 if (visitor.getSemantic()) {
-                    IRGenerator irGenerator = new IRGenerator(visitor.symbolTable());
+                    irGenerator = new IRGenerator(visitor.symbolTable());
                     irGenerator.visit(tree);
                     viewIR = new JFrame("Representacion Intermedia de Codigo de Mini Pascal");
                     viewIR.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
-                    viewIR.setLayout(new FlowLayout());
+                    viewIR.setLayout(new BorderLayout());
                     viewIR.setSize(1000, 620);
                     viewIR.setLocationRelativeTo(null);
-                    try {
-                        FileWriter file = new FileWriter(visitor.getName() + ".ll");
-                        file.write(irGenerator.getIR());
-                        file.close();
-                    } catch (IOException ex) {
-                        throw new RuntimeException(ex);
-                    }
+
                     JTextArea IRcode = new JTextArea(30, 60);
                     IRcode.setEditable(false);
                     IRcode.setText(irGenerator.getIR());
-                    viewIR.add(new JScrollPane(IRcode));
+
+                    exportButton = new JButton("Exportar .ll");
+                    exportButton.addActionListener(new ActionListener() {
+                        @Override
+                        public void actionPerformed(ActionEvent e) {
+                            String fileName = JOptionPane.showInputDialog(viewIR, "Enter the name for the .ll file:");
+                            if (fileName != null && !fileName.trim().isEmpty()) {
+                                if (!fileName.endsWith(".ll")) {
+                                    fileName += ".ll";
+                                }
+                                try {
+                                    irGenerator.writeToFile(fileName);
+                                    JOptionPane.showMessageDialog(viewIR, "IR written to file: " + fileName);
+                                } catch (Exception ex) {
+                                    JOptionPane.showMessageDialog(viewIR, "Error writing to file: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                                }
+                            }
+                        }
+                    });
+
+                    JPanel irPanel = new JPanel();
+                    irPanel.setLayout(new BorderLayout());
+                    irPanel.add(new JScrollPane(IRcode), BorderLayout.CENTER);
+                    irPanel.add(exportButton, BorderLayout.SOUTH);
+
+                    viewIR.add(irPanel);
                     viewIR.setVisible(true);
                 }
             } else {
@@ -156,7 +176,7 @@ public class MyFrame extends JFrame implements ActionListener {
                     ex.printStackTrace();
                 }
             }
-        }else if (e.getSource() == saveButton){
+        } else if (e.getSource() == saveButton) {
             JFileChooser fileChooser = new JFileChooser();
             fileChooser.setCurrentDirectory(new File("./src"));
             fileChooser.setDialogTitle("Save TXT File");
@@ -189,7 +209,6 @@ public class MyFrame extends JFrame implements ActionListener {
                 }
             }
         }
-
     }
 
     private void appendToPane(JTextPane tp, String msg, Color c) {

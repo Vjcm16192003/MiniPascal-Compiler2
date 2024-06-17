@@ -1,3 +1,4 @@
+
 @num1 = global i32 0
 @num2 = global i32 0
 @result = global i32 0
