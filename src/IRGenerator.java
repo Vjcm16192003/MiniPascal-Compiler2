@@ -99,8 +99,13 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
         String valor = this.visit(ctx.expression());
         String line = "";
 
+        // Generate a temporary variable for the assigned value
+        temps++;
+        String tempVar = "%temp." + temps;
+        irInstructions.add("\n\t" + tempVar + " = " + valor);
+
         if (names.get(varName).result) {
-            line = "\n\tret " + getLLVMDataType(names.get(varName).type) + " " + valor;
+            line = "\n\tret " + getLLVMDataType(names.get(varName).type) + " " + tempVar;
         } else {
             boolean val = false;
             for (String s : func_procs) {
@@ -109,7 +114,7 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
                 }
             }
             if (!val) {
-                line = "\n\tstore " + getLLVMDataType(names.get(varName).type) + " " + valor + ", " + getLLVMDataType(names.get(varName).type) + "* " + names.get(varName).IRname;
+                line = "\n\tstore " + getLLVMDataType(names.get(varName).type) + " " + tempVar + ", " + getLLVMDataType(names.get(varName).type) + "* " + names.get(varName).IRname;
             } else {
                 line = this.visit(ctx.expression());
             }
@@ -265,6 +270,7 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
                 num = Integer.parseInt(right);
                 simple = true;
             } catch (Exception e) {
+                // No hacer nada, simple sigue siendo false
             }
 
             String op = ctx.multiplicativeoperator().getText();
