@@ -53,7 +53,7 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
         if (!scope) {
             irInstructions.add("\ndefine i32 @main() {\nentry:");
             this.visit(ctx.statements());
-            irInstructions.add("\nend:\n\tret i32 0\n}\n");
+            irInstructions.add("\n\tret i32 0\n}\n");
             return null;
         }
         return super.visitCompoundStatement(ctx);
@@ -133,7 +133,7 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
                 if (names.containsKey(leftVar)) {
                     temps++;
                     left = "%temp." + temps;
-                    irInstructions.add("\n\t" + left + " = load i32, i32* @" + leftVar);
+                    irInstructions.add("\n\t" + left + " = load " + getLLVMDataType(names.get(leftVar).type) + ", " + getLLVMDataType(names.get(leftVar).type) + "* " + names.get(leftVar).IRname);
                 } else {
                     left = leftVar;
                 }
@@ -145,53 +145,57 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
                 if (names.containsKey(rightVar)) {
                     temps++;
                     right = "%temp." + temps;
-                    irInstructions.add("\n\t" + right + " = load i32, i32* @" + rightVar);
+                    irInstructions.add("\n\t" + right + " = load " + getLLVMDataType(names.get(rightVar).type) + ", " + getLLVMDataType(names.get(rightVar).type) + "* " + names.get(rightVar).IRname);
                 } else {
                     right = rightVar;
                 }
             }
 
             String op = ctx.relationaloperator().getText();
-            String comparisonResult = "";
+            String comparisonResult = "%temp." + (++temps);
             switch (op) {
                 case "=":
-                    temps++;
-                    comparisonResult = "%temp." + temps;
-                    irInstructions.add("\n\t" + comparisonResult + " = icmp eq i32 " + left + ", " + right);
+                    irInstructions.add("\n\t" + comparisonResult + " = icmp eq " + getLLVMDataType(names.get(leftVar).type) + " " + left + ", " + right);
                     break;
                 case "<>":
-                    temps++;
-                    comparisonResult = "%temp." + temps;
-                    irInstructions.add("\n\t" + comparisonResult + " = icmp ne i32 " + left + ", " + right);
+                    irInstructions.add("\n\t" + comparisonResult + " = icmp ne " + getLLVMDataType(names.get(leftVar).type) + " " + left + ", " + right);
                     break;
                 case ">":
-                    temps++;
-                    comparisonResult = "%temp." + temps;
-                    irInstructions.add("\n\t" + comparisonResult + " = icmp sgt i32 " + left + ", " + right);
+                    irInstructions.add("\n\t" + comparisonResult + " = icmp sgt " + getLLVMDataType(names.get(leftVar).type) + " " + left + ", " + right);
                     break;
                 case ">=":
-                    temps++;
-                    comparisonResult = "%temp." + temps;
-                    irInstructions.add("\n\t" + comparisonResult + " = icmp sge i32 " + left + ", " + right);
+                    irInstructions.add("\n\t" + comparisonResult + " = icmp sge " + getLLVMDataType(names.get(leftVar).type) + " " + left + ", " + right);
                     break;
                 case "<":
-                    temps++;
-                    comparisonResult = "%temp." + temps;
-                    irInstructions.add("\n\t" + comparisonResult + " = icmp slt i32 " + left + ", " + right);
+                    irInstructions.add("\n\t" + comparisonResult + " = icmp slt " + getLLVMDataType(names.get(leftVar).type) + " " + left + ", " + right);
                     break;
                 case "<=":
-                    temps++;
-                    comparisonResult = "%temp." + temps;
-                    irInstructions.add("\n\t" + comparisonResult + " = icmp sle i32 " + left + ", " + right);
+                    irInstructions.add("\n\t" + comparisonResult + " = icmp sle " + getLLVMDataType(names.get(leftVar).type) + " " + left + ", " + right);
                     break;
                 default:
-                    break;
+                    throw new IllegalStateException("Unexpected value: " + op);
             }
             return comparisonResult;
+        } else if (ctx.getChildCount() == 3 && ctx.getChild(1).getText().equals("and")) {
+            // Handle boolean 'and' operation
+            String left = this.visit(ctx.getChild(0));
+            String right = this.visit(ctx.getChild(2));
+            temps++;
+            String result = "%temp." + temps;
+            irInstructions.add("\n\t" + result + " = and i1 " + left + ", " + right);
+            return result;
+        } else if (ctx.getChildCount() == 2 && ctx.getChild(0).getText().equals("not")) {
+            // Handle boolean 'not' operation
+            String operand = this.visit(ctx.getChild(1));
+            temps++;
+            String result = "%temp." + temps;
+            irInstructions.add("\n\t" + result + " = xor i1 " + operand + ", true");
+            return result;
         } else {
             return this.visit(ctx.simpleExpression());
         }
     }
+
 
     private boolean isNumeric(String str) {
         try {
@@ -335,14 +339,14 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
         ifstate = true;
         temps = 0;
         repetitions = new ArrayList<>();
-        String conditionResult = this.visit(ctx.expression());
-        irInstructions.add("\n\tbr i1 " + conditionResult + ", label %itag, label %etag\n");
+        irInstructions.add("\n\tbr i1 %temp." + temps + ", label %itag, label %etag\n");
         irInstructions.add("\nitag:");
         this.visit(ctx.statement(0));
         irInstructions.add("\n\tbr label %end"); // Añadir br para saltar al final después del itag
         irInstructions.add("\netag:");
         this.visit(ctx.statement(1));
         irInstructions.add("\n\tbr label %end"); // Añadir br para saltar al final después del etag
+        irInstructions.add("\nend:");
         condcount = 0;
         return "";
     }

@@ -1,5 +1,4 @@
 program Hello;
-
 var
   a: Boolean;
   b: Boolean;
@@ -8,6 +7,6 @@ begin
     a := true;
     b := false;
   writeln ('Hola Mundo!');
-  result := a and not b;
+  result := a and b;
   writeln (result)
 end.
