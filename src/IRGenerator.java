@@ -18,6 +18,8 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
 
     private boolean scope = false, ifstate = false, exprepeat = false;
     private int count = 0, cparam = 0, temps = 0, condcount = 0, matches = 0;
+    private int labelCount = 0;  // Inicializando el contador de etiquetas.
+
     String IR = "";
 
     public IRGenerator(Stack<HashMap<String, Data>> localVars) {
@@ -96,167 +98,74 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
     @Override
     public String visitAssignmentStatement(MiniPascalParser.AssignmentStatementContext ctx) {
         String varName = ctx.variable().getText();
-        String valor = this.visit(ctx.expression());
-        String line = "";
+        String exprValue = this.visit(ctx.expression());  // Obtiene el valor de la expresión como una instrucción LLVM
 
-        // Generate a temporary variable for the assigned value
-        temps++;
-        String tempVar = "%temp." + temps;
-        irInstructions.add("\n\t" + tempVar + " = " + valor);
+        // Se asume que getLLVMDataType obtiene el tipo correcto de la variable
+        String llvmType = getLLVMDataType(names.get(varName).type);
+        irInstructions.add("\n\tstore " + llvmType + " " + exprValue + ", " + llvmType + "* @" + varName);
 
-        if (names.get(varName).result) {
-            line = "\n\tret " + getLLVMDataType(names.get(varName).type) + " " + tempVar;
-        } else {
-            boolean val = false;
-            for (String s : func_procs) {
-                if (ctx.expression().getText().contains(s)) {
-                    val = true;
-                }
-            }
-            if (!val) {
-                line = "\n\tstore " + getLLVMDataType(names.get(varName).type) + " " + tempVar + ", " + getLLVMDataType(names.get(varName).type) + "* " + names.get(varName).IRname;
-            } else {
-                line = this.visit(ctx.expression());
-            }
-        }
-
-        irInstructions.add(line);
-        return line;
+        return "";  // Retorna una cadena vacía si no es necesario devolver ninguna instrucción adicional
     }
 
     @Override
     public String visitExpression(MiniPascalParser.ExpressionContext ctx) {
-        if (ctx.relationaloperator() != null) {
-            String leftVar = this.visit(ctx.getChild(0));
-            String rightVar = this.visit(ctx.getChild(2));
-            String left = "";
-            String right = "";
+        if (ctx.getChildCount() == 3) {
+            String left = this.visit(ctx.getChild(0));  // Visitar el lado izquierdo
+            String right = this.visit(ctx.getChild(2)); // Visitar el lado derecho
+            String operator = ctx.getChild(1).getText();
 
-            if (isNumeric(leftVar)) {
-                left = leftVar;
-            } else {
-                if (names.containsKey(leftVar)) {
-                    temps++;
-                    left = "%temp." + temps;
-                    irInstructions.add("\n\t" + left + " = load " + getLLVMDataType(names.get(leftVar).type) + ", " + getLLVMDataType(names.get(leftVar).type) + "* " + names.get(leftVar).IRname);
-                } else {
-                    left = leftVar;
-                }
+            if (operator.equals("and")) {
+                String result = "%temp." + (++temps);
+                irInstructions.add("\n\t" + result + " = and i1 " + left + ", " + right);
+                return result;
             }
-
-            if (isNumeric(rightVar)) {
-                right = rightVar;
-            } else {
-                if (names.containsKey(rightVar)) {
-                    temps++;
-                    right = "%temp." + temps;
-                    irInstructions.add("\n\t" + right + " = load " + getLLVMDataType(names.get(rightVar).type) + ", " + getLLVMDataType(names.get(rightVar).type) + "* " + names.get(rightVar).IRname);
-                } else {
-                    right = rightVar;
-                }
-            }
-
-            String op = ctx.relationaloperator().getText();
-            String comparisonResult = "%temp." + (++temps);
-            switch (op) {
-                case "=":
-                    irInstructions.add("\n\t" + comparisonResult + " = icmp eq " + getLLVMDataType(names.get(leftVar).type) + " " + left + ", " + right);
-                    break;
-                case "<>":
-                    irInstructions.add("\n\t" + comparisonResult + " = icmp ne " + getLLVMDataType(names.get(leftVar).type) + " " + left + ", " + right);
-                    break;
-                case ">":
-                    irInstructions.add("\n\t" + comparisonResult + " = icmp sgt " + getLLVMDataType(names.get(leftVar).type) + " " + left + ", " + right);
-                    break;
-                case ">=":
-                    irInstructions.add("\n\t" + comparisonResult + " = icmp sge " + getLLVMDataType(names.get(leftVar).type) + " " + left + ", " + right);
-                    break;
-                case "<":
-                    irInstructions.add("\n\t" + comparisonResult + " = icmp slt " + getLLVMDataType(names.get(leftVar).type) + " " + left + ", " + right);
-                    break;
-                case "<=":
-                    irInstructions.add("\n\t" + comparisonResult + " = icmp sle " + getLLVMDataType(names.get(leftVar).type) + " " + left + ", " + right);
-                    break;
-                default:
-                    throw new IllegalStateException("Unexpected value: " + op);
-            }
-            return comparisonResult;
-        } else if (ctx.getChildCount() == 3 && ctx.getChild(1).getText().equals("and")) {
-            // Handle boolean 'and' operation
-            String left = this.visit(ctx.getChild(0));
-            String right = this.visit(ctx.getChild(2));
-            temps++;
-            String result = "%temp." + temps;
-            irInstructions.add("\n\t" + result + " = and i1 " + left + ", " + right);
-            return result;
-        } else if (ctx.getChildCount() == 2 && ctx.getChild(0).getText().equals("not")) {
-            // Handle boolean 'not' operation
-            String operand = this.visit(ctx.getChild(1));
-            temps++;
-            String result = "%temp." + temps;
-            irInstructions.add("\n\t" + result + " = xor i1 " + operand + ", true");
-            return result;
-        } else {
-            return this.visit(ctx.simpleExpression());
+            // Agrega otros operadores lógicos aquí si es necesario
         }
+        return visitChildren(ctx);  // Manejo por defecto si no es una operación binaria
     }
 
 
+    private String loadVariable(String varName) {
+        String llvmType = getLLVMDataType(names.get(varName).type);
+        String tempVar = "%temp." + (++temps);
+        irInstructions.add("\n\t" + tempVar + " = load " + llvmType + ", " + llvmType + "* @" + varName);
+        return tempVar;
+    }
+
+    private String translateOperator(String op) {
+        switch (op) {
+            case "=": return "eq";
+            case "<>": return "ne";
+            case ">": return "sgt";
+            case ">=": return "sge";
+            case "<": return "slt";
+            case "<=": return "sle";
+            default: throw new IllegalArgumentException("Unsupported operator: " + op);
+        }
+    }
+
     private boolean isNumeric(String str) {
         try {
-            Integer.parseInt(str);
+            Double.parseDouble(str);
             return true;
         } catch (NumberFormatException e) {
             return false;
         }
     }
-
     @Override
     public String visitSimpleExpression(MiniPascalParser.SimpleExpressionContext ctx) {
         if (ctx.getChildCount() > 1) {
-            String left = this.visit(ctx.term());
-            String right = this.visit(ctx.simpleExpression());
-            boolean simple = false;
-            int num;
-            try {
-                num = Integer.parseInt(left);
-                num = Integer.parseInt(right);
-                simple = true;
-            } catch (Exception e) {
-            }
-
-            String op = ctx.additiveoperator().getText();
-            switch (op) {
-                case "+":
-                    if (simple) {
-                        num = Integer.parseInt(left) + Integer.parseInt(right);
-                        return num + "";
-                    }
-                    temps++;
-                    irInstructions.add("\n\t%temp." + temps + " = add i32 " + left + ", " + right);
-                    return "%temp." + temps;
-                case "-":
-                    if (simple) {
-                        num = Integer.parseInt(left) - Integer.parseInt(right);
-                        return num + "";
-                    }
-                    temps++;
-                    irInstructions.add("\n\t%temp." + temps + " = sub i32 " + left + ", " + right);
-                    return "%temp." + temps;
-                case "or":
-                    condcount++;
-                    if (condcount < matches) {
-                        irInstructions.add("\n\tbr i1 %temp." + temps + ", label %itag, label %cond" + condcount + "\n");
-                        irInstructions.add("\ncond" + condcount + ":");
-                    }
-                    return "";
-                default:
-                    return "";
-            }
+            String leftOperand = this.visit(ctx.getChild(0));
+            String rightOperand = this.visit(ctx.getChild(2));
+            String llvmType = "i32";
+            String resultVar = "%temp." + (++temps);
+            irInstructions.add("\n\t" + resultVar + " = add " + llvmType + " " + leftOperand + ", " + rightOperand);
+            return resultVar;
         } else {
-            return this.visit(ctx.term());
+            return this.visit(ctx.getChild(0));
         }
     }
+
 
     @Override
     public String visitTerm(MiniPascalParser.TermContext ctx) {
@@ -332,29 +241,13 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
 
     @Override
     public String visitBool_(MiniPascalParser.Bool_Context ctx) {
-        return ctx.getText().equals("true") ? "1" : "0";
+        return ctx.getText().equals("true") ? "add i1 0, 1" : "add i1 0, 0";  // Usando la técnica de sumar a cero
     }
+
 
     @Override
     public String visitUnsignedInteger(MiniPascalParser.UnsignedIntegerContext ctx) {
         return ctx.getText();
-    }
-
-    @Override
-    public String visitIfStatement(MiniPascalParser.IfStatementContext ctx) {
-        ifstate = true;
-        temps = 0;
-        repetitions = new ArrayList<>();
-        irInstructions.add("\n\tbr i1 %temp." + temps + ", label %itag, label %etag\n");
-        irInstructions.add("\nitag:");
-        this.visit(ctx.statement(0));
-        irInstructions.add("\n\tbr label %end"); // Añadir br para saltar al final después del itag
-        irInstructions.add("\netag:");
-        this.visit(ctx.statement(1));
-        irInstructions.add("\n\tbr label %end"); // Añadir br para saltar al final después del etag
-        irInstructions.add("\nend:");
-        condcount = 0;
-        return "";
     }
 
     public static long countOccurrences(String source, String find) {
@@ -460,9 +353,82 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
             case "char":
                 return "i8";
             default:
-                return "ERROR";
+                throw new IllegalArgumentException("Unsupported type: " + type);
         }
     }
+
+    @Override
+    public String visitIfStatement(MiniPascalParser.IfStatementContext ctx) {
+        // Cargar los valores de las variables
+        String num1 = loadVariable("num1");
+        String num2 = loadVariable("num2");
+
+        // Realizar la comparación
+        String comparisonResult = "%cmp" + (++temps);
+        irInstructions.add("\n\t" + comparisonResult + " = icmp sgt i32 " + num1 + ", " + num2);
+
+        // Instrucción de salto condicional
+        irInstructions.add("\n\tbr i1 " + comparisonResult + ", label %if_true_1, label %if_false_2");
+
+        // Bloque if true
+        irInstructions.add("\nif_true_1:");
+        irInstructions.add("\n\tstore i32 " + num1 + ", i32* @result");
+        irInstructions.add("\n\tbr label %if_end_3");
+
+        // Bloque if false
+        irInstructions.add("\nif_false_2:");
+        irInstructions.add("\n\tstore i32 " + num2 + ", i32* @result");
+        irInstructions.add("\n\tbr label %if_end_3");
+
+        // Final del bloque if
+        irInstructions.add("\nif_end_3:");
+        irInstructions.add("\n\tret i32 0");
+
+        return "";  // Retorna una cadena vacía si no es necesario devolver ninguna instrucción adicional
+    }
+
+
+
+
+    @Override
+    public String visitConditionalStatement(MiniPascalParser.ConditionalStatementContext ctx) {
+        String result = "";
+
+        // Asumiendo que el ctx tiene un método ifStatement() que devuelve un IfStatementContext
+        MiniPascalParser.IfStatementContext ifCtx = ctx.ifStatement();
+
+        // Visita la condición y obtiene el valor de la evaluación
+        String condition = visit(ifCtx.expression());
+
+        // Identificadores únicos para las etiquetas de los bloques
+        String labelTrue = "if_true_" + (++labelCount);
+        String labelFalse = "if_false_" + (++labelCount);
+        String labelEnd = "if_end_" + (++labelCount);
+
+        // Instrucción para evaluar la condición y saltar a la etiqueta correspondiente
+        irInstructions.add("\n\tbr i1 " + condition + ", label %" + labelTrue + ", label %" + labelFalse);
+
+        // Bloque if
+        irInstructions.add("\n" + labelTrue + ":");
+        visit(ifCtx.statement(0)); // Visita el bloque then
+        irInstructions.add("\n\tbr label %" + labelEnd);  // Salto al final del bloque condicional
+
+        // Bloque else, si existe
+        if (ifCtx.statement().size() > 1) {  // Asegurarse de que existe un bloque else
+            irInstructions.add("\n" + labelFalse + ":");
+            visit(ifCtx.statement(1)); // Visita el bloque else
+        } else {
+            irInstructions.add("\n" + labelFalse + ":");
+        }
+        irInstructions.add("\n\tbr label %" + labelEnd);
+
+        // Etiqueta de finalización
+        irInstructions.add("\n" + labelEnd + ":");
+
+        return result;
+    }
+
+
 
     public void writeToFile(String filename) {
         try (FileWriter fileWriter = new FileWriter(filename)) {
