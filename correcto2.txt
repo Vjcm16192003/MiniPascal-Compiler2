@@ -1,0 +1,9 @@
+program AssignmentTest;
+var
+  x, y: Integer;
+begin
+  x := 10;
+  y := 20;
+  writeln(x);
+  writeln(y);
+end.
