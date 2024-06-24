@@ -101,7 +101,7 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
 
         // Generate a temporary variable for the assigned value
         temps++;
-        String tempVar = "%temp." + temps;
+        String tempVar = "%temp" + temps;
         irInstructions.add("\n\t" + tempVar + " = " + valor);
 
         if (names.get(varName).result) {

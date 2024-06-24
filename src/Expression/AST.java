@@ -99,6 +99,8 @@ public class AST extends MiniPascalBaseVisitor<Data>{
                 value = new Data(' ', localVars.size());
             }
 
+
+
             if (vNames == null) {
                 // peek() gets us the top element, i.e. current scope
                 //validacion de que si la variable ya habia sido inicializada
@@ -888,10 +890,6 @@ public class AST extends MiniPascalBaseVisitor<Data>{
                 }
                 // Place the variable name and its data value into this scope's variables (i.e. localVars)
                 if (vNames == null) {
-                    //System.out.println("I-sing: " + position);
-                    //System.out.println("VarName: " + varName);
-                    //Data val = this.visit(function.parameterList().actualParameter(i).parameterwidth(position).expression());
-                    //System.out.println("existen "+ localVars.peek().get(varName).getScope() +"parametros");
 
                     if(localVars.peek().get(varName)!=null && localVars.peek().get(varName).getScope()==cont-1) {//en caso de que se dar una variable ya usada
                         java.lang.String err = "Error Semantico en la linea " + ctx.getStart().getLine() + ": '" + varName + "' ya ha sido declarada";
