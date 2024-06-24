@@ -99,22 +99,40 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
         String valor = this.visit(ctx.expression());
         String line = "";
 
-        // Generate a temporary variable for the assigned value
-        temps++;
-        String tempVar = "%temp" + temps;
-        irInstructions.add("\n\t" + tempVar + " = " + valor);
+        Data_RI varData = names.get(varName);
+        if (varData == null) {
+            throw new IllegalStateException("Variable " + varName + " is not declared.");
+        }
 
-        if (names.get(varName).result) {
-            line = "\n\tret " + getLLVMDataType(names.get(varName).type) + " " + tempVar;
+        if (varData.result) {
+            line = "\n\tret " + getLLVMDataType(varData.type) + " " + valor;
         } else {
-            boolean val = false;
+            boolean isFunctionCall = false;
             for (String s : func_procs) {
                 if (ctx.expression().getText().contains(s)) {
-                    val = true;
+                    isFunctionCall = true;
+                    break;
                 }
             }
-            if (!val) {
-                line = "\n\tstore " + getLLVMDataType(names.get(varName).type) + " " + tempVar + ", " + getLLVMDataType(names.get(varName).type) + "* " + names.get(varName).IRname;
+            if (!isFunctionCall) {
+                if (!isNumeric(valor) && !valor.startsWith("%")) {
+                    Data_RI exprData = names.get(valor);
+                    if (exprData == null) {
+                        if ("true".equals(valor)) {
+                            valor = "1";
+                        } else if ("false".equals(valor)) {
+                            valor = "0";
+                        } else if (!valor.startsWith("%")) {
+                            throw new IllegalStateException("Expression " + valor + " is not declared.");
+                        }
+                    } else {
+                        temps++;
+                        String tempVar = "%temp." + temps;
+                        irInstructions.add("\n\t" + tempVar + " = load " + getLLVMDataType(exprData.type) + ", " + getLLVMDataType(exprData.type) + "* " + exprData.IRname);
+                        valor = tempVar;
+                    }
+                }
+                line = "\n\tstore " + getLLVMDataType(varData.type) + " " + valor + ", " + getLLVMDataType(varData.type) + "* " + varData.IRname;
             } else {
                 line = this.visit(ctx.expression());
             }
@@ -124,37 +142,21 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
         return line;
     }
 
+
+
     @Override
     public String visitExpression(MiniPascalParser.ExpressionContext ctx) {
         if (ctx.relationaloperator() != null) {
             String leftVar = this.visit(ctx.getChild(0));
             String rightVar = this.visit(ctx.getChild(2));
-            String left = "";
-            String right = "";
 
-            if (isNumeric(leftVar)) {
-                left = leftVar;
-            } else {
-                if (names.containsKey(leftVar)) {
-                    temps++;
-                    left = "%temp." + temps;
-                    irInstructions.add("\n\t" + left + " = load " + getLLVMDataType(names.get(leftVar).type) + ", " + getLLVMDataType(names.get(leftVar).type) + "* " + names.get(leftVar).IRname);
-                } else {
-                    left = leftVar;
-                }
-            }
+            temps++;
+            String left = "%temp." + temps;
+            irInstructions.add("\n\t" + left + " = load " + getLLVMDataType(names.get(leftVar).type) + ", " + getLLVMDataType(names.get(leftVar).type) + "* " + names.get(leftVar).IRname);
 
-            if (isNumeric(rightVar)) {
-                right = rightVar;
-            } else {
-                if (names.containsKey(rightVar)) {
-                    temps++;
-                    right = "%temp." + temps;
-                    irInstructions.add("\n\t" + right + " = load " + getLLVMDataType(names.get(rightVar).type) + ", " + getLLVMDataType(names.get(rightVar).type) + "* " + names.get(rightVar).IRname);
-                } else {
-                    right = rightVar;
-                }
-            }
+            temps++;
+            String right = "%temp." + temps;
+            irInstructions.add("\n\t" + right + " = load " + getLLVMDataType(names.get(rightVar).type) + ", " + getLLVMDataType(names.get(rightVar).type) + "* " + names.get(rightVar).IRname);
 
             String op = ctx.relationaloperator().getText();
             String comparisonResult = "%temp." + (++temps);
@@ -181,20 +183,22 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
                     throw new IllegalStateException("Unexpected value: " + op);
             }
             return comparisonResult;
-        } else if (ctx.getChildCount() == 3 && ctx.getChild(1).getText().equals("and")) {
-            // Handle boolean 'and' operation
+        } else if (ctx.getChildCount() == 3 && ctx.getChild(1).getText().equals("mod")) {
+            // Handle modulus operation
             String left = this.visit(ctx.getChild(0));
             String right = this.visit(ctx.getChild(2));
+
+            temps++;
+            String tempLeft = "%temp." + temps;
+            irInstructions.add("\n\t" + tempLeft + " = load i32, i32* " + names.get(left).IRname);
+
+            temps++;
+            String tempRight = "%temp." + temps;
+            irInstructions.add("\n\t" + tempRight + " = load i32, i32* " + names.get(right).IRname);
+
             temps++;
             String result = "%temp." + temps;
-            irInstructions.add("\n\t" + result + " = and i1 " + left + ", " + right);
-            return result;
-        } else if (ctx.getChildCount() == 2 && ctx.getChild(0).getText().equals("not")) {
-            // Handle boolean 'not' operation
-            String operand = this.visit(ctx.getChild(1));
-            temps++;
-            String result = "%temp." + temps;
-            irInstructions.add("\n\t" + result + " = xor i1 " + operand + ", true");
+            irInstructions.add("\n\t" + result + " = srem i32 " + tempLeft + ", " + tempRight);
             return result;
         } else {
             return this.visit(ctx.simpleExpression());
@@ -270,7 +274,6 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
                 num = Integer.parseInt(right);
                 simple = true;
             } catch (Exception e) {
-                // No hacer nada, simple sigue siendo false
             }
 
             String op = ctx.multiplicativeoperator().getText();
@@ -345,17 +348,25 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
         ifstate = true;
         temps = 0;
         repetitions = new ArrayList<>();
-        irInstructions.add("\n\tbr i1 %temp." + temps + ", label %itag, label %etag\n");
+        String conditionResult = this.visit(ctx.expression());
+
+        // Use the result of the expression directly
+        if (conditionResult == null) {
+            conditionResult = "%temp.3"; // Fallback to a specific temp if needed
+        }
+
+        irInstructions.add("\n\tbr i1 " + conditionResult + ", label %itag, label %etag\n");
         irInstructions.add("\nitag:");
         this.visit(ctx.statement(0));
-        irInstructions.add("\n\tbr label %end"); // Añadir br para saltar al final después del itag
+        irInstructions.add("\n\tbr label %end");
         irInstructions.add("\netag:");
         this.visit(ctx.statement(1));
-        irInstructions.add("\n\tbr label %end"); // Añadir br para saltar al final después del etag
+        irInstructions.add("\n\tbr label %end");
         irInstructions.add("\nend:");
         condcount = 0;
         return "";
     }
+
 
     public static long countOccurrences(String source, String find) {
         return Pattern.compile(find)

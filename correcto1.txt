@@ -1,0 +1,11 @@
+program IfElseTest;
+var
+  x, y: Integer;
+begin
+  x := 10;
+  y := 20;
+  if x > y then
+    writeln('x is greater than y')
+  else
+    writeln('x is not greater than y');
+end.
