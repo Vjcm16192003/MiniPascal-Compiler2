@@ -15,58 +15,79 @@ import javax.swing.text.StyleContext;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 public class MyFrame extends JFrame implements ActionListener {
 
-    JButton button;
-    TextArea Code;
+    JButton button, clearButton, loadButton, saveButton, exportButton;
+    JTextArea Code;
     JTextPane console;
     JScrollPane wscroller;
-    Box codearea;
+    JPanel codearea;
     JFrame pFrame = new JFrame(), viewIR = new JFrame();
-    MyFrame(){
-        this.setTitle("Mini Pascal");
+    IRGenerator irGenerator;
+
+    MyFrame() {
+        this.setTitle("Compilador de Mini Pascal");
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        this.setLayout(new FlowLayout());
-        this.setSize(1000, 620);
+        this.setLayout(new BorderLayout());
+        this.setSize(850, 700);
         this.setLocationRelativeTo(null);
-        codearea = Box.createVerticalBox();
+
+        codearea = new JPanel();
+        codearea.setLayout(new BoxLayout(codearea, BoxLayout.Y_AXIS));
+
         button = new JButton("Iniciar Programa");
         button.addActionListener(this);
-        Code = new TextArea(30, 80);
+
+        clearButton = new JButton("Limpiar");
+        clearButton.addActionListener(this);
+
+        loadButton = new JButton("Cargar Archivo");
+        loadButton.addActionListener(this);
+
+        saveButton = new JButton("Guardar Archivo");
+        saveButton.addActionListener(this);
+
+        Code = new JTextArea(10, 40);
         console = new JTextPane();
-        console.setBounds(0,0,600,600);
+        console.setBounds(0,0,50,50);
         wscroller = new JScrollPane(console){
             @Override
             public Dimension getPreferredSize() {
-                return new Dimension(200, 100);
+                return new Dimension(100, 50);
             }
         };
         wscroller.setBounds(0,0,600,600);
         Code.setEditable(true);
-        JLabel editor = new JLabel("Editor");
-        JLabel logs = new JLabel("Log");
+        JLabel editor = new JLabel("Code Editor");
+        JLabel logs = new JLabel("Console Log");
+
         codearea.add(editor);
-        codearea.add(Code);
+        codearea.add(new JScrollPane(Code));
         codearea.add(logs);
         codearea.add(wscroller);
+
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.setLayout(new FlowLayout());
+        buttonPanel.add(button);
+        buttonPanel.add(clearButton);
+        buttonPanel.add(loadButton);
+        buttonPanel.add(saveButton);
+
         this.add(codearea, BorderLayout.CENTER);
-        this.add(button);
+        this.add(buttonPanel, BorderLayout.SOUTH);
 
         this.setVisible(true);
     }
 
-
     @Override
-    public void actionPerformed(ActionEvent e){
-        if(e.getSource()==button){
+    public void actionPerformed(ActionEvent e) {
+        if (e.getSource() == button) {
             pFrame.setVisible(false);
             viewIR.setVisible(false);
             CharStream input = CharStreams.fromString(Code.getText());
@@ -80,55 +101,117 @@ public class MyFrame extends JFrame implements ActionListener {
             if (!MyErrorListener.hasError) {
                 pFrame = new JFrame("Parse Tree");
 
-                //List
+                // List
                 List<String> rules = new ArrayList<>();
                 rules.addAll(Arrays.asList(parser.getRuleNames()));
 
                 TreeViewer viewer = new TreeViewer(rules, tree);
-                viewer.setScale(viewer.getScale()/1.5);
+                viewer.setScale(viewer.getScale() / 1.5);
                 pFrame.add(viewer);
                 pFrame.pack();
                 pFrame.setLocationRelativeTo(null);
-                //frame.setSize(frame.getWidth(), frame.getHeight());
                 pFrame.setVisible(true);
                 pFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
-                AST visitor  = new AST(console);
+                AST visitor = new AST(console);
                 visitor.visit(tree);
-                if(visitor.getSemantic()){
-                    IRGenerator irGenerator = new IRGenerator(visitor.symbolTable());
+                if (visitor.getSemantic()) {
+                    irGenerator = new IRGenerator(visitor.symbolTable());
                     irGenerator.visit(tree);
-                    viewIR = new JFrame("IR de Codigo de Mini Pascal");
+                    viewIR = new JFrame("Representacion Intermedia de Codigo de Mini Pascal");
                     viewIR.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
-                    viewIR.setLayout(new FlowLayout());
-                    viewIR.setSize(1280, 720);
+                    viewIR.setLayout(new BorderLayout());
+                    viewIR.setSize(1000, 620);
                     viewIR.setLocationRelativeTo(null);
-                    try {
 
-                        FileWriter file = new FileWriter(visitor.getName()+".ll");
-                        file.write(irGenerator.getIR());
-                        file.close();
-                    } catch (IOException ex) {
-                        throw new RuntimeException(ex);
-                    }
-                    TextArea IRcode = new TextArea(40, 80);
+                    JTextArea IRcode = new JTextArea(30, 60);
                     IRcode.setEditable(false);
                     IRcode.setText(irGenerator.getIR());
-                    viewIR.add(IRcode);
+
+                    exportButton = new JButton("Exportar .ll");
+                    exportButton.addActionListener(new ActionListener() {
+                        @Override
+                        public void actionPerformed(ActionEvent e) {
+                            String fileName = JOptionPane.showInputDialog(viewIR, "Enter the name for the .ll file:");
+                            if (fileName != null && !fileName.trim().isEmpty()) {
+                                if (!fileName.endsWith(".ll")) {
+                                    fileName += ".ll";
+                                }
+                                try {
+                                    irGenerator.writeToFile(fileName);
+                                    JOptionPane.showMessageDialog(viewIR, "IR written to file: " + fileName);
+                                } catch (Exception ex) {
+                                    JOptionPane.showMessageDialog(viewIR, "Error writing to file: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                                }
+                            }
+                        }
+                    });
+
+                    JPanel irPanel = new JPanel();
+                    irPanel.setLayout(new BorderLayout());
+                    irPanel.add(new JScrollPane(IRcode), BorderLayout.CENTER);
+                    irPanel.add(exportButton, BorderLayout.SOUTH);
+
+                    viewIR.add(irPanel);
                     viewIR.setVisible(true);
                 }
-            }else{
+            } else {
                 console.setText(null);
-                appendToPane(console, MyErrorListener.getErrors()+"\n", Color.RED);
+                appendToPane(console, MyErrorListener.getErrors() + "\n", Color.RED);
                 console.update(console.getGraphics());
                 MyErrorListener.reset();
+            }
+        } else if (e.getSource() == clearButton) {
+            Code.setText("");
+            console.setText("");
+        } else if (e.getSource() == loadButton) {
+            JFileChooser fileChooser = new JFileChooser();
+            int result = fileChooser.showOpenDialog(this);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File selectedFile = fileChooser.getSelectedFile();
+                try (FileReader reader = new FileReader(selectedFile)) {
+                    Code.read(reader, null);
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
+        } else if (e.getSource() == saveButton) {
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setCurrentDirectory(new File("./src"));
+            fileChooser.setDialogTitle("Save TXT File");
+
+            int userSelection = fileChooser.showSaveDialog(null);
+
+            if (userSelection == JFileChooser.APPROVE_OPTION) {
+                File selectedFile = fileChooser.getSelectedFile();
+                String filePath = selectedFile.getAbsolutePath();
+
+                // Asegurarse de que el archivo tenga la extensión .txt
+                if (!filePath.endsWith(".txt")) {
+                    filePath += ".txt";
+                    selectedFile = new File(filePath);
+                }
+
+                try {
+                    // Obtener el texto del JTextArea
+                    System.out.printf(Code.toString());
+                    String textContent = Code.getText();
+
+                    // Escribir el contenido en el archivo
+                    try (BufferedWriter writer = new BufferedWriter(new FileWriter(selectedFile))) {
+                        writer.write(textContent);
+                    }
+
+                    System.out.println("Archivo guardado exitosamente: " + filePath);
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
             }
         }
     }
 
-    private void appendToPane(JTextPane tp, String msg, Color c)
-    {
+    private void appendToPane(JTextPane tp, String msg, Color c) {
         StyleContext sc = StyleContext.getDefaultStyleContext();
         AttributeSet aset = sc.addAttribute(SimpleAttributeSet.EMPTY, StyleConstants.Foreground, c);
 
@@ -141,4 +224,12 @@ public class MyFrame extends JFrame implements ActionListener {
         tp.replaceSelection(msg);
     }
 
+    private void clearConsole() {
+        System.out.print("\033[H\033[2J");
+        System.out.flush();
+    }
+
+    public static void main(String[] args) {
+        new MyFrame();
+    }
 }

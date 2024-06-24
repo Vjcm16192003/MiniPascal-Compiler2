@@ -2,45 +2,45 @@ import Expression.Data;
 import antlr.MiniPascalBaseVisitor;
 import antlr.MiniPascalParser;
 
-import java.awt.*;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.*;
 import java.util.regex.Pattern;
 
 public class IRGenerator extends MiniPascalBaseVisitor<String> {
     private Stack<HashMap<String, Data>> localVars = new Stack<>();
-    private HashMap<String, IRData> names = new HashMap<>();
+    private HashMap<String, Data_RI> names = new HashMap<>();
     private ArrayList<String> irInstructions = new ArrayList<>();
     private ArrayList<String> func_procs = new ArrayList<>();
     private ArrayList<String> global_strings = new ArrayList<>();
     private ArrayList<String> write = new ArrayList<>();
     private ArrayList<String> repetitions = new ArrayList<>();
 
-    private boolean scope =false, ifstate=false, exprepeat=false;
-    private int count =0, cparam=0, temps=0, condcount=0, matches=0;
-    String IR="";
+    private boolean scope = false, ifstate = false, exprepeat = false;
+    private int count = 0, cparam = 0, temps = 0, condcount = 0, matches = 0;
+    String IR = "";
 
-    public IRGenerator(Stack<HashMap<String, Data>> localVars){
+    public IRGenerator(Stack<HashMap<String, Data>> localVars) {
         this.localVars = localVars;
     }
 
     @Override
     public String visitProgram(MiniPascalParser.ProgramContext ctx) {
-        System.out.println("Segunda pasada, estoy en visitProgram");
-        scope=false;
+        scope = false;
         return super.visitProgram(ctx);
     }
 
     @Override
     public String visitProgramHeading(MiniPascalParser.ProgramHeadingContext ctx) {
-        System.out.println("Segunda pasada, estoy en visitProgramHeading");
-
         return super.visitProgramHeading(ctx);
     }
-    boolean ts=false;
+
+    boolean ts = false;
+
     @Override
     public String visitVariableDeclarationPart(MiniPascalParser.VariableDeclarationPartContext ctx) {
-        ts= scope;
-        for(MiniPascalParser.VariableDeclarationContext c: ctx.variableDeclaration()){
+        ts = scope;
+        for (MiniPascalParser.VariableDeclarationContext c : ctx.variableDeclaration()) {
             irInstructions.add(this.visit(c));
         }
         return null;
@@ -48,12 +48,12 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
 
     @Override
     public String visitCompoundStatement(MiniPascalParser.CompoundStatementContext ctx) {
-        count=0;
-        cparam=0;
-        if(!scope){
+        count = 0;
+        cparam = 0;
+        if (!scope) {
             irInstructions.add("\ndefine i32 @main() {\nentry:");
             this.visit(ctx.statements());
-            irInstructions.add("\nend:\n\tret i32 0\n}\n");
+            irInstructions.add("\n\tret i32 0\n}\n");
             return null;
         }
         return super.visitCompoundStatement(ctx);
@@ -61,38 +61,32 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
 
     @Override
     public String visitVariableDeclaration(MiniPascalParser.VariableDeclarationContext ctx) {
-        Data value = null;
         String varName = ctx.identifierList().getText();
         String[] vNames;
-        if(varName.contains(",")){
+        if (varName.contains(",")) {
             vNames = parseString(varName);
-        }else{
-            vNames=null;
+        } else {
+            vNames = null;
         }
-        if(vNames==null){ //Si las variables están declaradas sin coma, separadas por ;
-
-            if(!scope){
-                names.put(varName,new IRData("@"+varName, ctx.type_().getText().toLowerCase(), false));
-                irInstructions.add("\n@"+varName+" = global "+getLLVMDataType(ctx.type_().getText().toLowerCase())+" 0");
+        if (vNames == null) {
+            if (!scope) {
+                names.put(varName, new Data_RI("@" + varName, ctx.type_().getText().toLowerCase(), false));
+                irInstructions.add("\n@" + varName + " = global " + getLLVMDataType(ctx.type_().getText().toLowerCase()) + " 0");
                 return "";
-            }else{
-                names.put(varName,new IRData("%"+varName, ctx.type_().getText().toLowerCase(), false));
-                //irInstructions.add("\n\t%"+varName+" = alloca "+getLLVMDataType(ctx.type_().getText().toLowerCase()));
-                return "\n\t%"+varName+" = alloca "+getLLVMDataType(ctx.type_().getText().toLowerCase());
+            } else {
+                names.put(varName, new Data_RI("%" + varName, ctx.type_().getText().toLowerCase(), false));
+                return "\n\t%" + varName + " = alloca " + getLLVMDataType(ctx.type_().getText().toLowerCase());
             }
-
-        }
-        else{ //Var a,b,c: boolean, por ejemplo
-            String line="";
-            for(int i=0; i<vNames.length; i++){
-                if(!scope){
-                    names.put(vNames[i],new IRData("@"+vNames[i], ctx.type_().getText().toLowerCase(), false));
-                    irInstructions.add("\n@"+vNames[i]+" = global "+getLLVMDataType(ctx.type_().getText().toLowerCase())+" 0");
+        } else {
+            String line = "";
+            for (String vName : vNames) {
+                if (!scope) {
+                    names.put(vName, new Data_RI("@" + vName, ctx.type_().getText().toLowerCase(), false));
+                    irInstructions.add("\n@" + vName + " = global " + getLLVMDataType(ctx.type_().getText().toLowerCase()) + " 0");
                     line = "";
-                }else{
-                    names.put(vNames[i],new IRData("%"+vNames[i], ctx.type_().getText().toLowerCase(), false));
-                    //irInstructions.add("\n\t%"+vNames[i]+" = alloca "+getLLVMDataType(ctx.type_().getText().toLowerCase()));
-                    line = line+ "\n\t%"+vNames[i]+" = alloca "+getLLVMDataType(ctx.type_().getText().toLowerCase());
+                } else {
+                    names.put(vName, new Data_RI("%" + vName, ctx.type_().getText().toLowerCase(), false));
+                    line = line + "\n\t%" + vName + " = alloca " + getLLVMDataType(ctx.type_().getText().toLowerCase());
                 }
             }
             return line;
@@ -102,295 +96,233 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
     @Override
     public String visitAssignmentStatement(MiniPascalParser.AssignmentStatementContext ctx) {
         String varName = ctx.variable().getText();
-        String valor = ctx.expression().getText();
-        String line="";
+        String valor = this.visit(ctx.expression());
+        String line = "";
 
-        //OBTENER EL TIPO DE DATO QUE SE LE ASIGNÓ A LA VARIABLE, EJEMPLO: c:='5', obtener CHAR
-        for (HashMap<String, Data> scope : localVars) {
-            Set<String> variableNames = scope.keySet();
-            for (String name : variableNames) {
-                if(varName.equals(name) && scope.get(name).instanceOf().equals("char")){
-                    int asciiValue = valor.charAt(1); //'a', solo obtengo la a y la convierto a su ascii
-                    valor = ""+asciiValue;
+        // Generate a temporary variable for the assigned value
+        temps++;
+        String tempVar = "%temp" + temps;
+        irInstructions.add("\n\t" + tempVar + " = " + valor);
+
+        if (names.get(varName).result) {
+            line = "\n\tret " + getLLVMDataType(names.get(varName).type) + " " + tempVar;
+        } else {
+            boolean val = false;
+            for (String s : func_procs) {
+                if (ctx.expression().getText().contains(s)) {
+                    val = true;
                 }
+            }
+            if (!val) {
+                line = "\n\tstore " + getLLVMDataType(names.get(varName).type) + " " + tempVar + ", " + getLLVMDataType(names.get(varName).type) + "* " + names.get(varName).IRname;
+            } else {
+                line = this.visit(ctx.expression());
             }
         }
 
-        String[] vNames;
-        if (varName.contains(",")) {
-            vNames = parseString(varName);
-        }
-        else{
-            vNames = null;
-        }
-
-        if (vNames == null) {
-            if(names.get(varName).result){
-                line = "\n\tret "+ getLLVMDataType(names.get(varName).type) +" "+valor;
-            }else{
-                boolean val=false;
-                for(String s: func_procs){
-                    if(ctx.expression().getText().contains(s)){
-                        val=true;
-                    }
-                }
-                if(!val){
-                    line= "\n\tstore "+getLLVMDataType(names.get(varName).type)+" "+valor+", ptr "+
-                            names.get(varName).IRname;
-                }else{
-                    line = this.visit(ctx.expression());
-                }
-            }
-
-
-        }
-        else{
-            for (int i = 0; i < vNames.length; i++){
-                line= "\n\tstore "+getLLVMDataType(names.get(vNames[i]).type)+" "+valor+", ptr "+
-                        names.get(vNames[i]).IRname;
-
-            }
-        }
-
-        //System.out.println("Local initialized variables: " + localVars.peek());
         irInstructions.add(line);
         return line;
     }
 
     @Override
     public String visitExpression(MiniPascalParser.ExpressionContext ctx) {
-        if(ctx.getChildCount()>1){
-            String left = this.visit(ctx.simpleExpression());
-            String right = this.visit(ctx.expression());
+        if (ctx.relationaloperator() != null) {
+            String leftVar = this.visit(ctx.getChild(0));
+            String rightVar = this.visit(ctx.getChild(2));
+            String left = "";
+            String right = "";
 
+            if (isNumeric(leftVar)) {
+                left = leftVar;
+            } else {
+                if (names.containsKey(leftVar)) {
+                    temps++;
+                    left = "%temp." + temps;
+                    irInstructions.add("\n\t" + left + " = load " + getLLVMDataType(names.get(leftVar).type) + ", " + getLLVMDataType(names.get(leftVar).type) + "* " + names.get(leftVar).IRname);
+                } else {
+                    left = leftVar;
+                }
+            }
 
-            if (ctx.relationaloperator().getText().equals("=")){
-                if(ifstate){
+            if (isNumeric(rightVar)) {
+                right = rightVar;
+            } else {
+                if (names.containsKey(rightVar)) {
                     temps++;
-                    irInstructions.add("\n\t%temp."+temps+" = icmp eq i32 "+left+", "+right);
-                }else{
-                    count++;
-                    irInstructions.add("\n\t%"+count+" = icmp eq i32 "+left+", "+right);
+                    right = "%temp." + temps;
+                    irInstructions.add("\n\t" + right + " = load " + getLLVMDataType(names.get(rightVar).type) + ", " + getLLVMDataType(names.get(rightVar).type) + "* " + names.get(rightVar).IRname);
+                } else {
+                    right = rightVar;
                 }
-                return "";
             }
-            else if (ctx.relationaloperator().getText().equals("<>")){
-                if(ifstate){
-                    temps++;
-                    irInstructions.add("\n\t%temp."+temps+" = icmp ne i32 "+left+", "+right);
-                }else{
-                    count++;
-                    irInstructions.add("\n\t%"+count+" = icmp ne i32 "+left+", "+right);
-                }
-                return "";
+
+            String op = ctx.relationaloperator().getText();
+            String comparisonResult = "%temp." + (++temps);
+            switch (op) {
+                case "=":
+                    irInstructions.add("\n\t" + comparisonResult + " = icmp eq " + getLLVMDataType(names.get(leftVar).type) + " " + left + ", " + right);
+                    break;
+                case "<>":
+                    irInstructions.add("\n\t" + comparisonResult + " = icmp ne " + getLLVMDataType(names.get(leftVar).type) + " " + left + ", " + right);
+                    break;
+                case ">":
+                    irInstructions.add("\n\t" + comparisonResult + " = icmp sgt " + getLLVMDataType(names.get(leftVar).type) + " " + left + ", " + right);
+                    break;
+                case ">=":
+                    irInstructions.add("\n\t" + comparisonResult + " = icmp sge " + getLLVMDataType(names.get(leftVar).type) + " " + left + ", " + right);
+                    break;
+                case "<":
+                    irInstructions.add("\n\t" + comparisonResult + " = icmp slt " + getLLVMDataType(names.get(leftVar).type) + " " + left + ", " + right);
+                    break;
+                case "<=":
+                    irInstructions.add("\n\t" + comparisonResult + " = icmp sle " + getLLVMDataType(names.get(leftVar).type) + " " + left + ", " + right);
+                    break;
+                default:
+                    throw new IllegalStateException("Unexpected value: " + op);
             }
-            else if (ctx.relationaloperator().getText().equals(">")){
-                if(ifstate){
-                    temps++;
-                    irInstructions.add("\n\t%temp."+temps+" = icmp sgt i32 "+left+", "+right);
-                }else{
-                    count++;
-                    irInstructions.add("\n\t%"+count+" = icmp sgt i32 "+left+", "+right);
-                }
-                return "";
-            }
-            else if (ctx.relationaloperator().getText().equals(">=")){
-                if(ifstate){
-                    temps++;
-                    irInstructions.add("\n\t%temp."+temps+" = icmp sge i32 "+left+", "+right);
-                }else{
-                    count++;
-                    irInstructions.add("\n\t%"+count+" = icmp sge i32 "+left+", "+right);
-                }
-                return "";
-            }
-            else if (ctx.relationaloperator().getText().equals("<")){
-                if(ifstate){
-                    temps++;
-                    irInstructions.add("\n\t%temp."+temps+" = icmp slt i32 "+left+", "+right);
-                }else{
-                    count++;
-                    irInstructions.add("\n\t%"+count+" = icmp slt i32 "+left+", "+right);
-                }
-                return "";
-            }
-            else if (ctx.relationaloperator().getText().equals("<=")){
-                if(ifstate){
-                    temps++;
-                    irInstructions.add("\n\t%temp."+temps+" = icmp sle i32 "+left+", "+right);
-                }else{
-                    count++;
-                    irInstructions.add("\n\t%"+count+" = icmp sle i32 "+left+", "+right);
-                }
-                return "";
-            }else{
-                return "";
-            }
-        }else{
+            return comparisonResult;
+        } else if (ctx.getChildCount() == 3 && ctx.getChild(1).getText().equals("and")) {
+            // Handle boolean 'and' operation
+            String left = this.visit(ctx.getChild(0));
+            String right = this.visit(ctx.getChild(2));
+            temps++;
+            String result = "%temp." + temps;
+            irInstructions.add("\n\t" + result + " = and i1 " + left + ", " + right);
+            return result;
+        } else if (ctx.getChildCount() == 2 && ctx.getChild(0).getText().equals("not")) {
+            // Handle boolean 'not' operation
+            String operand = this.visit(ctx.getChild(1));
+            temps++;
+            String result = "%temp." + temps;
+            irInstructions.add("\n\t" + result + " = xor i1 " + operand + ", true");
+            return result;
+        } else {
             return this.visit(ctx.simpleExpression());
         }
     }
 
 
+    private boolean isNumeric(String str) {
+        try {
+            Integer.parseInt(str);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
 
     @Override
     public String visitSimpleExpression(MiniPascalParser.SimpleExpressionContext ctx) {
-        if(ctx.getChildCount()>1){
+        if (ctx.getChildCount() > 1) {
             String left = this.visit(ctx.term());
             String right = this.visit(ctx.simpleExpression());
             boolean simple = false;
             int num;
-            try{
+            try {
                 num = Integer.parseInt(left);
                 num = Integer.parseInt(right);
-                simple=true;
-            }catch (Exception e){
-
+                simple = true;
+            } catch (Exception e) {
             }
 
-            if (ctx.additiveoperator().getText().equals("+")){
-                if(simple){
-                    num = Integer.parseInt(left)+Integer.parseInt(right);
-                    return num+"";
-                }
-                if(ifstate){
-                    temps++;
-                    irInstructions.add("\n\t%temp."+temps+" = add i32 "+left+", "+right);
-                }else{
-                    count++;
-                    irInstructions.add("\n\t%"+count+" = add i32 "+left+", "+right);
-                }
-                return "";
-
-            }
-            else if (ctx.additiveoperator().getText().equals("-")){
-                if(simple){
-                    num = Integer.parseInt(left)-Integer.parseInt(right);
-                    return num+"";
-                }
-                if(ifstate){
-                    temps++;
-                    irInstructions.add("\n\t%temp."+temps+" = sub i32 "+left+", "+right);
-                }else{
-                    count++;
-                    irInstructions.add("\n\t%"+count+" = sub i32 "+left+", "+right);
-                }
-                return "";
-            }
-            else if (ctx.additiveoperator().getText().equalsIgnoreCase("or")){
-                if(ifstate){
-                    condcount++;
-                    if(condcount<matches) {
-                        irInstructions.add("\n\tbr i1 %temp." + temps + ", label %itag, label %cond" + condcount + "\n");
-                        irInstructions.add("\ncond"+condcount+":");
+            String op = ctx.additiveoperator().getText();
+            switch (op) {
+                case "+":
+                    if (simple) {
+                        num = Integer.parseInt(left) + Integer.parseInt(right);
+                        return num + "";
                     }
-                }
-                return "";
+                    temps++;
+                    irInstructions.add("\n\t%temp." + temps + " = add i32 " + left + ", " + right);
+                    return "%temp." + temps;
+                case "-":
+                    if (simple) {
+                        num = Integer.parseInt(left) - Integer.parseInt(right);
+                        return num + "";
+                    }
+                    temps++;
+                    irInstructions.add("\n\t%temp." + temps + " = sub i32 " + left + ", " + right);
+                    return "%temp." + temps;
+                case "or":
+                    condcount++;
+                    if (condcount < matches) {
+                        irInstructions.add("\n\tbr i1 %temp." + temps + ", label %itag, label %cond" + condcount + "\n");
+                        irInstructions.add("\ncond" + condcount + ":");
+                    }
+                    return "";
+                default:
+                    return "";
             }
-            else{
-                return"";
-            }
-        }else{
+        } else {
             return this.visit(ctx.term());
         }
     }
 
     @Override
     public String visitTerm(MiniPascalParser.TermContext ctx) {
-        if(ctx.getChildCount()>1){
+        if (ctx.getChildCount() > 1) {
             String left = this.visit(ctx.signedFactor());
             String right = this.visit(ctx.term());
             boolean simple = false;
             int num;
-            try{
+            try {
                 num = Integer.parseInt(left);
                 num = Integer.parseInt(right);
-                simple=true;
-            }catch (Exception e){
-
+                simple = true;
+            } catch (Exception e) {
+                // No hacer nada, simple sigue siendo false
             }
 
-
-            if (ctx.multiplicativeoperator().getText().equals("*")){
-                if(simple){
-                    num = Integer.parseInt(left)*Integer.parseInt(right);
-                    return num+"";
-                }
-                if(ifstate){
-                    temps++;
-                    irInstructions.add("\n\t%temp."+temps+" = mul i32 "+left+", "+right);
-                }else{
-                    count++;
-                    irInstructions.add("\n\t%"+count+" = mul i32 "+left+", "+right);
-                }
-                return "";
-
-            }
-            else if (ctx.multiplicativeoperator().getText().equals("/")){
-                if(simple){
-                    num = Integer.parseInt(left)/Integer.parseInt(right);
-                    return num+"";
-                }
-                if(ifstate){
-                    temps++;
-                    irInstructions.add("\n\t%temp."+temps+" = sdiv i32 "+left+", "+right);
-                }else{
-                    count++;
-                    irInstructions.add("\n\t%"+count+" = sdiv i32 "+left+", "+right);
-                }
-                return "";
-            }
-            else if (ctx.multiplicativeoperator().getText().equalsIgnoreCase("div")){
-                if(simple){
-                    num = Integer.parseInt(left)/Integer.parseInt(right);
-                    return num+"";
-                }
-                if(ifstate){
-                    temps++;
-                    irInstructions.add("\n\t%temp."+temps+" = sdiv i32 "+left+", "+right);
-                }else{
-                    count++;
-                    irInstructions.add("\n\t%"+count+" = sdiv i32 "+left+", "+right);
-                }
-                return "";
-            }else if (ctx.multiplicativeoperator().getText().equalsIgnoreCase("mod")){
-                if(simple){
-                    num = Integer.parseInt(left)%Integer.parseInt(right);
-                    return num+"";
-                }
-                if(ifstate){
-                    temps++;
-                    irInstructions.add("\n\t%temp."+temps+" = srem i32 "+left+", "+right);
-                }else{
-                    count++;
-                    irInstructions.add("\n\t%"+count+" = srem i32 "+left+", "+right);
-                }
-                return "";
-            }else if (ctx.multiplicativeoperator().getText().equalsIgnoreCase("and")){
-                if(ifstate){
-                    condcount++;
-                    if(condcount<matches) {
-                        irInstructions.add("\n\tbr i1 %temp." + temps + ", label %cond" + condcount + ", label %etag\n");
-                        irInstructions.add("\ncond"+condcount+":");
+            String op = ctx.multiplicativeoperator().getText();
+            switch (op) {
+                case "*":
+                    if (simple) {
+                        num = Integer.parseInt(left) * Integer.parseInt(right);
+                        return num + "";
                     }
-                }
+                    temps++;
+                    irInstructions.add("\n\t%temp." + temps + " = mul i32 " + left + ", " + right);
+                    return "%temp." + temps;
+                case "/":
+                case "div":
+                    if (simple) {
+                        num = Integer.parseInt(left) / Integer.parseInt(right);
+                        return num + "";
+                    }
+                    temps++;
+                    irInstructions.add("\n\t%temp." + temps + " = sdiv i32 " + left + ", " + right);
+                    return "%temp." + temps;
+                case "mod":
+                    if (simple) {
+                        num = Integer.parseInt(left) % Integer.parseInt(right);
+                        return num + "";
+                    }
+                    temps++;
+                    irInstructions.add("\n\t%temp." + temps + " = srem i32 " + left + ", " + right);
+                    return "%temp." + temps;
+                case "and":
+                    condcount++;
+                    if (condcount < matches) {
+                        irInstructions.add("\n\tbr i1 %temp." + temps + ", label %cond" + condcount + ", label %etag\n");
+                        irInstructions.add("\ncond" + condcount + ":");
+                    }
+                    return "";
+                default:
+                    return "";
             }
-            return "";
-        }else{
+        } else {
             return this.visit(ctx.signedFactor());
         }
     }
 
     @Override
     public String visitSignedFactor(MiniPascalParser.SignedFactorContext ctx) {
-        String factor= this.visit(ctx.factor());
-        if(!(ctx.type==null)){
-            if(ctx.type.getType()==MiniPascalParser.MINUS){
-                int num = -(Integer.parseInt(factor));
-                return num+"";
-            }
+        String factor = this.visit(ctx.factor());
+        if (ctx.type != null && ctx.type.getType() == MiniPascalParser.MINUS) {
+            int num = -(Integer.parseInt(factor));
+            return num + "";
         }
-        return this.visit(ctx.factor());
+        return factor;
     }
 
     @Override
@@ -400,7 +332,7 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
 
     @Override
     public String visitBool_(MiniPascalParser.Bool_Context ctx) {
-        return ctx.getText();
+        return ctx.getText().equals("true") ? "1" : "0";
     }
 
     @Override
@@ -410,76 +342,61 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
 
     @Override
     public String visitIfStatement(MiniPascalParser.IfStatementContext ctx) {
-        ifstate=true;
-        temps=0;
+        ifstate = true;
+        temps = 0;
         repetitions = new ArrayList<>();
-        String s = ctx.expression().getText().toLowerCase();
-        matches = (int) countOccurrences(s, "and");
-        matches = matches + (int) countOccurrences(s, "or");
-        matches++;
-        this.visit(ctx.expression());
         irInstructions.add("\n\tbr i1 %temp." + temps + ", label %itag, label %etag\n");
         irInstructions.add("\nitag:");
         this.visit(ctx.statement(0));
+        irInstructions.add("\n\tbr label %end"); // Añadir br para saltar al final después del itag
         irInstructions.add("\netag:");
         this.visit(ctx.statement(1));
-        condcount=0;
+        irInstructions.add("\n\tbr label %end"); // Añadir br para saltar al final después del etag
+        irInstructions.add("\nend:");
+        condcount = 0;
         return "";
     }
 
     public static long countOccurrences(String source, String find) {
-
-        return Pattern.compile(find) // Pattern
-                .matcher(source) // Mather
-                .results()       // Stream<MatchResults>
+        return Pattern.compile(find)
+                .matcher(source)
+                .results()
                 .count();
     }
 
     @Override
     public String visitFunctionDeclaration(MiniPascalParser.FunctionDeclarationContext ctx) {
-        scope=true;
+        scope = true;
         String name = ctx.identifier().getText();
-        String line = "\ndefine "+getLLVMDataType(ctx.resultType().getText().toLowerCase())+" @"+name+"(";
-        names.put(name, new IRData("@"+name, ctx.resultType().getText().toLowerCase(), true));
+        String line = "\ndefine " + getLLVMDataType(ctx.resultType().getText().toLowerCase()) + " @" + name + "(";
+        names.put(name, new Data_RI("@" + name, ctx.resultType().getText().toLowerCase(), true));
         func_procs.add(name);
-        for (int i = 0; i < ctx.formalParameterList().formalParameterSection().size(); i++){
-
+        for (int i = 0; i < ctx.formalParameterList().formalParameterSection().size(); i++) {
             String varName = ctx.formalParameterList().formalParameterSection(i).parameterGroup().identifierList().getText();
             String[] vNames;
             if (varName.contains(",")) {
                 vNames = parseString(varName);
-            }
-            else{
+            } else {
                 vNames = null;
             }
-            System.out.println(line.substring(line.length()-1));
-
-            // Place the variable name and its data value into this scope's variables (i.e. localVars)
             if (vNames == null) {
-                if(!line.substring(line.length() - 1).equals("(") && !line.substring(line.length() - 1).equals(",")){
+                if (!line.substring(line.length() - 1).equals("(") && !line.substring(line.length() - 1).equals(",")) {
                     line = line + ", ";
                 }
-                    //System.out.println("Added: " + val);
-                    // peek() gets us the top element, i.e. current scope
-                    line = line+getLLVMDataType(ctx.formalParameterList().formalParameterSection(i).parameterGroup().typeIdentifier().getText())+" %"+varName;
-
-            }
-            else{
-                for (int k = 0; k < vNames.length; k++){
-                    if(!line.substring(line.length() - 1).equals("(") && !line.substring(line.length() - 1).equals(",")){
+                line = line + getLLVMDataType(ctx.formalParameterList().formalParameterSection(i).parameterGroup().typeIdentifier().getText()) + " %" + varName;
+            } else {
+                for (String vName : vNames) {
+                    if (!line.substring(line.length() - 1).equals("(") && !line.substring(line.length() - 1).equals(",")) {
                         line = line + ", ";
                     }
-                    line = line+getLLVMDataType(ctx.formalParameterList().formalParameterSection(i).parameterGroup().typeIdentifier().getText())+" %"+vNames[k];
-
-
+                    line = line + getLLVMDataType(ctx.formalParameterList().formalParameterSection(i).parameterGroup().typeIdentifier().getText()) + " %" + vName;
                 }
             }
         }
-        line = line+") {\nentry:";
+        line = line + ") {\nentry:";
         irInstructions.add(line);
-        irInstructions.add("\n"+this.visit(ctx.block())+"\n}\n");
-        scope=false;
-
+        irInstructions.add("\n" + this.visit(ctx.block()) + "\n}\n");
+        scope = false;
         return "";
     }
 
@@ -487,50 +404,53 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
     public String visitFunctionDesignator(MiniPascalParser.FunctionDesignatorContext ctx) {
         count++;
         ArrayList<String> params = new ArrayList<>();
-        for(MiniPascalParser.ActualParameterContext c :ctx.parameterList().actualParameter()){
-            if(names.get(c.expression().getText())!=null){
+        for (MiniPascalParser.ActualParameterContext c : ctx.parameterList().actualParameter()) {
+            if (names.get(c.expression().getText()) != null) {
                 cparam++;
-                params.add(getLLVMDataType(names.get(c.expression().getText()).type)+" %t"+cparam);
-                irInstructions.add("\n\t%t"+cparam+" = load "+getLLVMDataType(names.get(c.expression().getText()).type)+", "+getLLVMDataType(names.get(c.expression().getText()).type)+"* "+names.get(c.expression().getText()).IRname);
-            }else{
-                try{
-                    int num  = Integer.parseInt(this.visit(c.expression()));
-                    params.add("i32 "+num);
-                }catch (Exception e){
-                    if(c.expression().getText().equals("true") || c.expression().getText().equals("false")){
-                        params.add("i1 "+c.expression().getText());
-                    }else{
-                        if(c.expression().getText().length()>1){
-                            params.add("i8* "+c.expression().getText());
-                        }else{
-                            params.add("i8 "+c.expression().getText());
+                params.add(getLLVMDataType(names.get(c.expression().getText()).type) + " %temp" + cparam);
+                irInstructions.add("\n\t%t" + cparam + " = load " + getLLVMDataType(names.get(c.expression().getText()).type) + ", " + getLLVMDataType(names.get(c.expression().getText()).type) + "* " + names.get(c.expression().getText()).IRname);
+            } else {
+                try {
+                    int num = Integer.parseInt(this.visit(c.expression()));
+                    params.add("i32 " + num);
+                } catch (Exception e) {
+                    if (c.expression().getText().equals("true") || c.expression().getText().equals("false")) {
+                        params.add("i1 " + c.expression().getText());
+                    } else {
+                        if (c.expression().getText().length() > 1) {
+                            params.add("i8* " + c.expression().getText());
+                        } else {
+                            params.add("i8 " + c.expression().getText());
                         }
                     }
                 }
             }
         }
         String name = ctx.identifier().getText();
-        String line = "\n\t%"+count+"= call "+getLLVMDataType(names.get(name).type)+" "+names.get(name).IRname+"(";
-        for(String s: params){
-            line = line+s+", ";
+        String line = "\n\t%" + count + "= call " + getLLVMDataType(names.get(name).type) + " " + names.get(name).IRname + "(";
+        for (String s : params) {
+            line = line + s + ", ";
         }
-        line = line.substring(0, line.length()-2);
-        line = line+")";
+        if (!params.isEmpty()) {
+            line = line.substring(0, line.length() - 2);
+        }
+        line = line + ")";
+        irInstructions.add(line);
         return line;
     }
 
     @Override
     public String visitProcedureDeclaration(MiniPascalParser.ProcedureDeclarationContext ctx) {
-        scope=true;
+        scope = true;
         return super.visitProcedureDeclaration(ctx);
     }
 
-    private String[] parseString(String variable_list){
+    private String[] parseString(String variable_list) {
         return variable_list.split("\\s*,\\s*");
     }
 
-    private String getLLVMDataType(String type){
-        switch(type){
+    private String getLLVMDataType(String type) {
+        switch (type) {
             case "boolean":
                 return "i1";
             case "integer":
@@ -544,21 +464,26 @@ public class IRGenerator extends MiniPascalBaseVisitor<String> {
         }
     }
 
-    public String getIR(){
-        String IR= "";
-        /*for(String s: global_strings){
-            IR = IR + s+"\n";
-        }*/
-        for(int i=0; i<irInstructions.size(); i++){
-            IR = IR + irInstructions.get(i);
+    public void writeToFile(String filename) {
+        try (FileWriter fileWriter = new FileWriter(filename)) {
+            fileWriter.write(getIR());
+            System.out.println("IR written to file: " + filename);
+        } catch (IOException e) {
+            System.err.println("Error writing to file: " + e.getMessage());
         }
-        if(!write.isEmpty()){
-            IR = IR+"declare dso_local i32 @printf(ptr noundef, ...) #1\n";
-            for(String s: write){
-
-            }
-        }
-        return IR;
     }
 
+    public String getIR() {
+        StringBuilder IR = new StringBuilder();
+        for (String instruction : irInstructions) {
+            IR.append(instruction);
+        }
+        if (!write.isEmpty()) {
+            IR.append("declare dso_local i32 @printf(ptr noundef, ...) #1\n");
+            for (String s : write) {
+                // Instrucciones para printf si se utilizan
+            }
+        }
+        return IR.toString();
+    }
 }

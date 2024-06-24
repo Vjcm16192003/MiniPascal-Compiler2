@@ -17,9 +17,6 @@ import javax.swing.text.StyleContext;
 // Our custom visitor extends the base visitor
 public class AST extends MiniPascalBaseVisitor<Data>{
 
-
-
-
     // Diferentes listas de variables para el encapsulamiento
     Stack<HashMap<java.lang.String, Data>> localVars = new Stack<>();
     // Global vars will be the variables at the lowest scope level
@@ -101,6 +98,8 @@ public class AST extends MiniPascalBaseVisitor<Data>{
             }else if (ctx.type_().getText().equalsIgnoreCase("char")){
                 value = new Data(' ', localVars.size());
             }
+
+
 
             if (vNames == null) {
                 // peek() gets us the top element, i.e. current scope
@@ -209,7 +208,7 @@ public class AST extends MiniPascalBaseVisitor<Data>{
                 Data[] var = temp.toArray();
                 var[pos1.toInteger()-temp.getPos1()] = value;
                 localVars.peek().put(varName, new Data(var, localVars.size()));
-                System.out.println("Se asigno a la variable: " + varName + ", el valor: " + value);
+                System.out.println("Se le asigno a la variable: " + varName + ", el siguiente valor: " + value);
             }
 
             if (vNames == null) {
@@ -224,16 +223,15 @@ public class AST extends MiniPascalBaseVisitor<Data>{
                     semantic=false;
                 } else {
 
-                    System.out.println("Se asigno a la variable: " + varName + ", el valor: " + value);
-                    //System.out.println(globalVars.get(varName).instanceOf());
+                    System.out.println("Se le asigno a la variable: " + varName + ", el siguiente valor: " + value);
                     if(localVars.peek().containsKey(varName)) {
 
                         if(value == null){
-                            System.out.println("and i oop");
+                            System.out.println("error, vuelva a intentarlo");
                             return null;
                         }
-                        System.out.println("Instanciado como " + localVars.peek().get(varName).instanceOf()
-                                + " asignándole " + value.instanceOf());
+                        System.out.println("Tipo de variable Instanciado como: " + localVars.peek().get(varName).instanceOf()
+                                + " asignándole: " + value.instanceOf());
 
                         //System.out.println("el value es "+value);//succ
 
@@ -241,7 +239,7 @@ public class AST extends MiniPascalBaseVisitor<Data>{
                         if (!localVars.peek().get(varName).instanceOf().equals(value.instanceOf())
                                 && !((localVars.peek().get(varName).instanceOf().equals("array") && value.instanceOf().equals("integer")))) {
                             java.lang.String err = "Error Semantico en la linea "+ctx.getStart().getLine()+": Se esparaba tipo: '"+localVars.peek().get(varName).instanceOf()+
-                                    "' en la variable '"+varName+"', pero se dio tipo: '"+value.instanceOf()+"'";//CAMBIOOOO
+                                    "' en la variable '"+varName+"', pero se dio tipo: '"+value.instanceOf()+"'";
                             appendToPane(writer, err+"\n", Color.RED);
                             writer.update(writer.getGraphics());
                             semantic=false;
@@ -264,8 +262,6 @@ public class AST extends MiniPascalBaseVisitor<Data>{
                             localVars.peek().put(varName, value);
                         }
 
-                        //localVars.peek().put(varName, value);
-
                     }
                 }
 
@@ -283,7 +279,6 @@ public class AST extends MiniPascalBaseVisitor<Data>{
                         System.out.println("Instanciado como " + localVars.peek().get(vNames[i]).instanceOf()
                                 + " asignándole " + value.instanceOf());
 
-                        //System.out.println("el value es "+value);//succ
 
                         if (!localVars.peek().get(vNames[i]).instanceOf().equals(value.instanceOf())
                                 && !((localVars.peek().get(vNames[i]).instanceOf().equals("array") && value.instanceOf().equals("integer")))) {
@@ -297,12 +292,8 @@ public class AST extends MiniPascalBaseVisitor<Data>{
                         }
 
                     }
-                    //localVars.peek().put(vNames[i], value);
-
                 }
             }
-
-            //System.out.println("Local initialized variables: " + localVars.peek());
 
             return value;
         }else{
@@ -521,7 +512,9 @@ public class AST extends MiniPascalBaseVisitor<Data>{
         }
         return this.visit(ctx.factor());
     }
-    /******************getting types of data**********************/
+
+
+
     @Override
     public Data visitNotFactor(MiniPascalParser.NotFactorContext ctx) {
         Data bool = visit(ctx.factor());
@@ -897,10 +890,6 @@ public class AST extends MiniPascalBaseVisitor<Data>{
                 }
                 // Place the variable name and its data value into this scope's variables (i.e. localVars)
                 if (vNames == null) {
-                    //System.out.println("I-sing: " + position);
-                    //System.out.println("VarName: " + varName);
-                    //Data val = this.visit(function.parameterList().actualParameter(i).parameterwidth(position).expression());
-                    //System.out.println("existen "+ localVars.peek().get(varName).getScope() +"parametros");
 
                     if(localVars.peek().get(varName)!=null && localVars.peek().get(varName).getScope()==cont-1) {//en caso de que se dar una variable ya usada
                         java.lang.String err = "Error Semantico en la linea " + ctx.getStart().getLine() + ": '" + varName + "' ya ha sido declarada";
